@@ -1,0 +1,41 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Native build output
+cmake-build-*/
+out/
+*.o
+*.a
+*.so
+*.elf
+*.map
+
+# Local ROMs, BIOS, saves, and generated proprietary game data
+*.gba
+*.gbc
+*.gb
+*.sav
+*.srm
+baserom.*
+rom.gba
+*.ips
+*.ups
+*.bps
+
+# Signing keys and secrets
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+
+# OS/editor
+.DS_Store
+Thumbs.db
