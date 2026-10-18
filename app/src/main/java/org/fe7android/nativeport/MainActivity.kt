@@ -10,13 +10,13 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.io.IOException
+import java.util.Locale
 
 /**
  * Prototype launcher with a user-selected ROM document.
- *
- * The ROM stays wherever the user selected it from. This app does not upload or copy it.
- * The game engine is not integrated yet, so selecting a ROM only remembers its URI for a
- * future engine integration; it does not make the game playable by itself.
+ * The ROM remains at its chosen location; this app does not upload or copy it.
+ * This screen reads only the GBA header. The game engine is not integrated yet.
  */
 class MainActivity : Activity() {
     private lateinit var romStatus: TextView
@@ -26,6 +26,8 @@ class MainActivity : Activity() {
         private const val PREFS = "fe7_settings"
         private const val KEY_ROM_URI = "selected_rom_uri"
         private const val KEY_ROM_NAME = "selected_rom_name"
+        private const val GBA_HEADER_SIZE = 0xB0
+        private const val MIN_GBA_SIZE = 0xC0
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,7 +48,7 @@ class MainActivity : Activity() {
         }
 
         val description = TextView(this).apply {
-            text = "Selecciona tu propia ROM legal de Fire Emblem: The Blazing Blade (US).\n\nLa app no incluye una ROM y no la sube a internet."
+            text = "Selecciona tu propia ROM de Fire Emblem: The Blazing Blade (US).\n\nLa app no incluye una ROM ni la sube a internet."
             textSize = 16f
             gravity = Gravity.CENTER
             setTextColor(0xFFF1F3F8.toInt())
@@ -66,7 +68,7 @@ class MainActivity : Activity() {
         }
 
         val warning = TextView(this).apply {
-            text = "Aviso: esta versión solo recuerda el archivo elegido. El motor del juego aún no está integrado, así que la ROM todavía no se puede ejecutar."
+            text = "Prototipo: se comprueba la cabecera del archivo, pero el motor del juego aún no está integrado y la ROM todavía no se puede ejecutar."
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(0xFFFFD98A.toInt())
@@ -106,21 +108,30 @@ class MainActivity : Activity() {
         val uri: Uri = data?.data ?: return
         val displayName = queryDisplayName(uri) ?: uri.lastPathSegment ?: "archivo seleccionado"
 
-        if (!displayName.lowercase().endsWith(".gba")) {
-            romStatus.text = "Archivo seleccionado: $displayName\nParece que no termina en .gba. Selecciona una ROM GBA válida."
+        if (!displayName.lowercase(Locale.ROOT).endsWith(".gba")) {
+            romStatus.text = "Archivo seleccionado: $displayName\nSelecciona un archivo .gba."
+            return
+        }
+
+        val header = try {
+            readGbaHeader(uri)
+        } catch (_: Exception) {
+            romStatus.text = "No se pudo leer el archivo. Comprueba los permisos y vuelve a intentarlo."
+            return
+        }
+
+        if (header == null) {
+            romStatus.text = "El archivo es demasiado pequeño o no se pudo leer como una ROM GBA."
             return
         }
 
         try {
-            val flags = data?.flags ?: 0
-            val readFlags = flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            if (readFlags != 0) {
-                contentResolver.takePersistableUriPermission(uri, readFlags)
-            }
+            val grantedFlags = (data.flags) and Intent.FLAG_GRANT_READ_URI_PERMISSION
+            if (grantedFlags != 0) contentResolver.takePersistableUriPermission(uri, grantedFlags)
         } catch (_: SecurityException) {
-            // Some document providers do not support persistable grants; keep this session's URI.
+            // Some providers do not support persisted grants.
         } catch (_: IllegalArgumentException) {
-            // Provider did not offer a persistable permission.
+            // The provider did not offer a persistable permission.
         }
 
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
@@ -128,23 +139,66 @@ class MainActivity : Activity() {
             .putString(KEY_ROM_NAME, displayName)
             .apply()
 
-        romStatus.text = "ROM seleccionada: $displayName\nLa ubicación se guardó en este dispositivo. El motor todavía no la está leyendo."
+        val sizeText = if (header.sizeBytes > 0) formatSize(header.sizeBytes) else "tamaño desconocido"
+        val identity = if (header.title.replace(" ", "").contains("FIREEMBLEM", ignoreCase = true)) {
+            "La cabecera parece corresponder a Fire Emblem."
+        } else {
+            "No se pudo confirmar que sea Fire Emblem; se guardó de todos modos."
+        }
+        romStatus.text = "Archivo: ${displayName}\nTítulo: ${header.title.ifBlank { "(vacío)" }}\nCódigo: ${header.gameCode.ifBlank { "(vacío)" }} · $sizeText\n$identity\nGuardado localmente; aún no se ejecuta."
     }
+
+    private data class GbaHeader(val title: String, val gameCode: String, val sizeBytes: Long)
+
+    @Throws(IOException::class)
+    private fun readGbaHeader(uri: Uri): GbaHeader? {
+        val bytes = ByteArray(GBA_HEADER_SIZE)
+        val input = contentResolver.openInputStream(uri) ?: return null
+        val readCount = input.use { stream ->
+            var total = 0
+            while (total < bytes.size) {
+                val count = stream.read(bytes, total, bytes.size - total)
+                if (count <= 0) break
+                total += count
+            }
+            total
+        }
+        if (readCount < MIN_GBA_SIZE) return null
+
+        val title = bytes.copyOfRange(0xA0, 0xAC).decodeToString().trim('\u0000', ' ')
+        val gameCode = bytes.copyOfRange(0xAC, 0xB0).decodeToString().trim('\u0000', ' ')
+        return GbaHeader(title, gameCode, queryFileSize(uri))
+    }
+
+    private fun queryFileSize(uri: Uri): Long {
+        return try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (index >= 0 && !cursor.isNull(index)) cursor.getLong(index) else -1L
+                } else -1L
+            } ?: -1L
+        } catch (_: Exception) {
+            -1L
+        }
+    }
+
+    private fun formatSize(bytes: Long): String =
+        String.format(Locale.ROOT, "%.2f MiB", bytes / (1024.0 * 1024.0))
 
     private fun restoreSavedRom() {
         val prefs = getSharedPreferences(PREFS, MODE_PRIVATE)
-        val uri = prefs.getString(KEY_ROM_URI, null)
+        val uriText = prefs.getString(KEY_ROM_URI, null)
         val name = prefs.getString(KEY_ROM_NAME, null)
-        romStatus.text = if (uri != null && name != null) {
-            // A previously granted document URI may become unavailable if the user moves/deletes it.
-            val readable = try {
-                contentResolver.openFileDescriptor(Uri.parse(uri), "r")?.use { true } ?: false
+        romStatus.text = if (uriText != null && name != null) {
+            try {
+                val header = readGbaHeader(Uri.parse(uriText))
+                if (header != null) {
+                    "ROM guardada: $name\nTítulo: ${header.title.ifBlank { "(vacío)" }} · Código: ${header.gameCode.ifBlank { "(vacío)" }}\nEl motor aún no la ejecuta."
+                } else {
+                    "El archivo guardado ya no parece legible. Selecciónalo otra vez."
+                }
             } catch (_: Exception) {
-                false
-            }
-            if (readable) {
-                "ROM guardada: $name\nEl motor todavía no la está leyendo."
-            } else {
                 "La ROM guardada ya no está disponible. Selecciónala otra vez."
             }
         } else {
