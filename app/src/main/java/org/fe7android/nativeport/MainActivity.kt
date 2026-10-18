@@ -126,7 +126,7 @@ class MainActivity : Activity() {
         }
 
         try {
-            val grantedFlags = (data.flags) and Intent.FLAG_GRANT_READ_URI_PERMISSION
+            val grantedFlags = ((data?.flags) ?: 0) and Intent.FLAG_GRANT_READ_URI_PERMISSION
             if (grantedFlags != 0) contentResolver.takePersistableUriPermission(uri, grantedFlags)
         } catch (_: SecurityException) {
             // Some providers do not support persisted grants.
