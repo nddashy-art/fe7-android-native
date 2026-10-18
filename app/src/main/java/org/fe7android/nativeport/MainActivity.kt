@@ -27,8 +27,15 @@ class MainActivity : Activity() {
         private const val KEY_ROM_URI = "selected_rom_uri"
         private const val KEY_ROM_NAME = "selected_rom_name"
         private const val GBA_HEADER_SIZE = 0xB0
-        private const val MIN_GBA_SIZE = 0xC0
+        private const val MIN_GBA_SIZE = GBA_HEADER_SIZE
     }
+
+    init {
+        System.loadLibrary("fe7native")
+    }
+
+    private external fun nativeGetBridgeStatus(): String
+    private external fun nativeInspectGbaHeader(header: ByteArray): String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,7 +75,7 @@ class MainActivity : Activity() {
         }
 
         val warning = TextView(this).apply {
-            text = "Prototipo: se comprueba la cabecera del archivo, pero el motor del juego aún no está integrado y la ROM todavía no se puede ejecutar."
+            text = "${nativeGetBridgeStatus()}\n\nPrototipo: el motor del juego aún no está integrado y la ROM todavía no se puede ejecutar."
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(0xFFFFD98A.toInt())
@@ -140,7 +147,7 @@ class MainActivity : Activity() {
             .apply()
 
         val sizeText = if (header.sizeBytes > 0) formatSize(header.sizeBytes) else "tamaño desconocido"
-        val identity = if (header.title.replace(" ", "").contains("FIREEMBLEM", ignoreCase = true)) {
+        val identity = if (header.looksLikeFireEmblem) {
             "La cabecera parece corresponder a Fire Emblem."
         } else {
             "No se pudo confirmar que sea Fire Emblem; se guardó de todos modos."
@@ -148,7 +155,12 @@ class MainActivity : Activity() {
         romStatus.text = "Archivo: ${displayName}\nTítulo: ${header.title.ifBlank { "(vacío)" }}\nCódigo: ${header.gameCode.ifBlank { "(vacío)" }} · $sizeText\n$identity\nGuardado localmente; aún no se ejecuta."
     }
 
-    private data class GbaHeader(val title: String, val gameCode: String, val sizeBytes: Long)
+    private data class GbaHeader(
+        val title: String,
+        val gameCode: String,
+        val sizeBytes: Long,
+        val looksLikeFireEmblem: Boolean
+    )
 
     @Throws(IOException::class)
     private fun readGbaHeader(uri: Uri): GbaHeader? {
@@ -165,9 +177,15 @@ class MainActivity : Activity() {
         }
         if (readCount < MIN_GBA_SIZE) return null
 
-        val title = bytes.copyOfRange(0xA0, 0xAC).decodeToString().trim('\u0000', ' ')
-        val gameCode = bytes.copyOfRange(0xAC, 0xB0).decodeToString().trim('\u0000', ' ')
-        return GbaHeader(title, gameCode, queryFileSize(uri))
+        // Native C++ parses the header from bytes read locally on-device.
+        val fields = nativeInspectGbaHeader(bytes).split('\n', limit = 3)
+        if (fields.size != 3) return null
+        return GbaHeader(
+            title = fields[0],
+            gameCode = fields[1],
+            sizeBytes = queryFileSize(uri),
+            looksLikeFireEmblem = fields[2] == "1"
+        )
     }
 
     private fun queryFileSize(uri: Uri): Long {
