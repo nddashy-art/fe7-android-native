@@ -27,19 +27,15 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Set up Android SDK, NDK, and CMake
-        uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platforms;android-35
-            build-tools;35.0.0
-            cmake;3.22.1
-            ndk;27.2.12479018
-
       - name: Test portable C++ GBA-header parser
         run: |
           c++ -std=c++17 -Wall -Wextra -Werror -I app/src/main/cpp tools/test_gba_header_parser.cpp -o /tmp/fe7-gba-header-test
           /tmp/fe7-gba-header-test
+
+      - name: Set up Android SDK, NDK, and CMake
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-35 build-tools;35.0.0 cmake;3.22.1 ndk;27.2.12479018
 
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
