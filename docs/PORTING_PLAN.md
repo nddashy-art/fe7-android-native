@@ -13,9 +13,9 @@ This document tracks the work needed to turn the GBA decompilation into an Andro
 
 ## Stage 1 — Minimal Android shell
 
-- Add an Android Gradle project and native build integration (NDK/CMake or the upstream-compatible toolchain).
+- Add an Android Gradle project and native build integration. The project now builds a small C++/JNI diagnostic library via Android NDK/CMake; this is not the FE7 engine.
 - Add application lifecycle handling, orientation/aspect-ratio handling, audio output, and app-private save paths.
-- Add a diagnostic screen or small native test before integrating game code.
+- Add a diagnostic screen and a portable C++ header parser with synthetic host-side tests before integrating game code.
 
 **Exit criteria:** debug APK builds in CI and installs/launches on a real Android device.
 
@@ -60,6 +60,7 @@ GitHub Actions can compile source code, but it cannot supply proprietary game da
 
 ## Current blockers
 
-- The actual decompilation source tree and its build configuration must be reviewed before selecting the final native integration.
-- No Android project, Android build, or on-device test has been completed yet.
+- The source archive has been reviewed; see [DECOMPILATION_AUDIT.md](DECOMPILATION_AUDIT.md). The original project targets ARM7TDMI and directly accesses GBA hardware registers.
+- The launcher has been installed and opened on the user's device, but the new NDK/JNI bridge still needs a confirmed CI build and on-device smoke test.
+- No FE7 engine, game frame loop, graphics/audio/input hardware replacement, or title-screen boot is implemented.
 - Multiplayer and modding are future milestones, not existing functionality.
