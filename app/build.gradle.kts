@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "org.fe7android.nativeport"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "org.fe7android.nativeport"
@@ -13,6 +14,13 @@ android {
         targetSdk = 28
         versionCode = 1
         versionName = "0.1.0-scaffold"
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildTypes {
