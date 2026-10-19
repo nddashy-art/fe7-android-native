@@ -9,6 +9,8 @@ constexpr std::uint32_t kDisplayControl = 0x04000000u;
 constexpr std::uint32_t kBgControlBase = 0x04000008u;
 constexpr std::uint32_t kBgHofsBase = 0x04000010u;
 constexpr std::uint32_t kBgVofsBase = 0x04000012u;
+constexpr std::uint32_t kBgAffineBase = 0x04000020u;
+constexpr std::uint16_t kBgAffineWrap = 1u << 13;
 constexpr std::uint32_t kPpuPaletteBase = 0x05000000u;
 constexpr std::uint32_t kPpuVramBase = 0x06000000u;
 constexpr std::uint32_t kPpuOamBase = 0x07000000u;
@@ -107,6 +109,90 @@ bool PpuRenderer::ReadTextTilePixel(unsigned, std::uint16_t control,
         const unsigned palette_bank = (entry >> 12) & 0x0Fu;
         *palette_index = static_cast<std::uint8_t>(palette_bank * 16u + nibble);
     }
+    return true;
+}
+
+
+bool PpuRenderer::RenderAffineBackgroundPixel(unsigned bg, unsigned x, unsigned y,
+                                              std::uint32_t* color,
+                                              std::uint16_t* rank) const {
+    if (bg < 2 || bg > 3 || color == nullptr || rank == nullptr) return false;
+
+    std::uint16_t control = 0;
+    if (!Read16(memory_, kBgControlBase + bg * 2u, &control)) return false;
+
+    const std::uint32_t matrix = kBgAffineBase + (bg - 2u) * 0x10u;
+    std::uint16_t pa_bits = 0, pb_bits = 0, pc_bits = 0, pd_bits = 0;
+    std::uint32_t ref_x_bits = 0, ref_y_bits = 0;
+    if (!Read16(memory_, matrix, &pa_bits) ||
+        !Read16(memory_, matrix + 2u, &pb_bits) ||
+        !Read16(memory_, matrix + 4u, &pc_bits) ||
+        !Read16(memory_, matrix + 6u, &pd_bits) ||
+        !memory_.Read32(matrix + 8u, &ref_x_bits) ||
+        !memory_.Read32(matrix + 12u, &ref_y_bits)) {
+        return false;
+    }
+
+    // BGxX/BGxY are signed 28-bit 20.8 fixed-point references; PA..PD are
+    // signed 8.8 matrix terms. Floor negative coordinates like an arithmetic shift.
+    const auto sign_extend_28 = [](std::uint32_t value) -> std::int32_t {
+        value &= 0x0FFFFFFFu;
+        if ((value & 0x08000000u) != 0) value |= 0xF0000000u;
+        return static_cast<std::int32_t>(value);
+    };
+    const auto fixed_floor_8 = [](std::int64_t value) -> std::int64_t {
+        return value >= 0 ? value / 256 : -((-value + 255) / 256);
+    };
+
+    const auto pa = static_cast<std::int16_t>(pa_bits);
+    const auto pb = static_cast<std::int16_t>(pb_bits);
+    const auto pc = static_cast<std::int16_t>(pc_bits);
+    const auto pd = static_cast<std::int16_t>(pd_bits);
+    const std::int64_t ref_x = sign_extend_28(ref_x_bits);
+    const std::int64_t ref_y = sign_extend_28(ref_y_bits);
+    std::int64_t source_x = fixed_floor_8(ref_x +
+        static_cast<std::int64_t>(pa) * x + static_cast<std::int64_t>(pb) * y);
+    std::int64_t source_y = fixed_floor_8(ref_y +
+        static_cast<std::int64_t>(pc) * x + static_cast<std::int64_t>(pd) * y);
+
+    const unsigned size = (control >> 14) & 3u;
+    const unsigned dimension_pixels = 128u << size;
+    const unsigned dimension_tiles = dimension_pixels >> 3;
+    if ((control & kBgAffineWrap) != 0) {
+        const auto wrap = [dimension_pixels](std::int64_t coordinate) -> unsigned {
+            const std::int64_t dimension = dimension_pixels;
+            coordinate %= dimension;
+            if (coordinate < 0) coordinate += dimension;
+            return static_cast<unsigned>(coordinate);
+        };
+        source_x = wrap(source_x);
+        source_y = wrap(source_y);
+    } else if (source_x < 0 || source_y < 0 ||
+               source_x >= dimension_pixels || source_y >= dimension_pixels) {
+        return false;
+    }
+
+    const unsigned pixel_x = static_cast<unsigned>(source_x);
+    const unsigned pixel_y = static_cast<unsigned>(source_y);
+    const unsigned tile_x = pixel_x >> 3;
+    const unsigned tile_y = pixel_y >> 3;
+    const unsigned screen_base = (control >> 8) & 31u;
+    const std::uint32_t map_address = kPpuVramBase + screen_base * 0x800u +
+        tile_y * dimension_tiles + tile_x;
+    std::uint8_t tile_number = 0;
+    if (!memory_.Read8(map_address, &tile_number)) return false;
+
+    const unsigned char_base = (control >> 2) & 3u;
+    const std::uint32_t tile_address = kPpuVramBase + char_base * 0x4000u +
+        static_cast<unsigned>(tile_number) * 64u +
+        (pixel_y & 7u) * 8u + (pixel_x & 7u);
+    // BG character data cannot read the OBJ-only half of VRAM.
+    if (tile_address >= kPpuVramBase + 0x10000u) return false;
+    std::uint8_t palette_index = 0;
+    if (!memory_.Read8(tile_address, &palette_index)) return false;
+
+    *color = ReadPaletteColor(palette_index);
+    *rank = static_cast<std::uint16_t>((control & 3u) * 1000u + 256u + bg);
     return true;
 }
 
@@ -244,15 +330,19 @@ bool PpuRenderer::RenderFrame(std::uint32_t* output_argb, std::size_t pixel_coun
         pixel.rank = 4000u;
     }
 
-    // Mode 0 is the common text-background mode; mode 1 still has two text BGs.
-    const unsigned bg_count = mode == 0 ? 4u : (mode == 1 ? 2u : 0u);
+    // Mode 0 uses four text BGs; mode 1 adds affine BG2; mode 2 has affine BG2/BG3.
+    const unsigned bg_count = mode == 0 ? 4u : (mode == 1 ? 3u : (mode == 2 ? 4u : 0u));
     for (unsigned bg = 0; bg < bg_count; ++bg) {
         if ((display_control & (kBgEnableBase << bg)) == 0) continue;
+        const bool affine = (mode == 2) || (mode == 1 && bg == 2);
         for (unsigned y = 0; y < kPpuFrameHeight; ++y) {
             for (unsigned x = 0; x < kPpuFrameWidth; ++x) {
                 std::uint32_t color = 0;
                 std::uint16_t rank = 0;
-                if (!RenderTextBackgroundPixel(bg, x, y, &color, &rank)) continue;
+                const bool drawn = affine
+                    ? RenderAffineBackgroundPixel(bg, x, y, &color, &rank)
+                    : RenderTextBackgroundPixel(bg, x, y, &color, &rank);
+                if (!drawn) continue;
                 const std::size_t index = static_cast<std::size_t>(y) * kPpuFrameWidth + x;
                 if (rank < pixels_[index].rank) {
                     pixels_[index].rank = rank;
@@ -262,7 +352,7 @@ bool PpuRenderer::RenderFrame(std::uint32_t* output_argb, std::size_t pixel_coun
         }
     }
 
-    if (mode <= 1) RenderObjects();
+    if (mode <= 2) RenderObjects();
     for (std::size_t i = 0; i < kPpuFramePixels; ++i)
         output_argb[i] = pixels_[i].color;
     return true;
