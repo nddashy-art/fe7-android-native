@@ -26,11 +26,12 @@ if(FE7_SOURCE_ROOT)
         message(FATAL_ERROR "FE7_SOURCE_ROOT must point to the extracted fe7_us-main source root (containing include/ and src/).")
     endif()
 
-    # This first real-source slice consists of FE7 translation units confirmed
-    # to be data-only (global game-state tables), not a pretend full engine.
+    # This first real-source slice consists of low-dependency FE7 C translation
+    # units (some contain helper logic and some declare global game state), not
+    # a pretend full engine.
     # The entrypoint, renderer, game loop and ARM7 service dependencies are
     # separate follow-up milestones.
-    set(FE7_NATIVE_DATA_SOURCES
+    set(FE7_NATIVE_SEED_SOURCES
         "${FE7_SOURCE_ROOT}/src/util.c"
         "${FE7_SOURCE_ROOT}/src/text.c"
         "${FE7_SOURCE_ROOT}/src/face.c"
@@ -45,27 +46,27 @@ if(FE7_SOURCE_ROOT)
         "${FE7_SOURCE_ROOT}/src/debug_text.c"
         "${FE7_SOURCE_ROOT}/src/banim_sprite.c"
     )
-    foreach(FE7_SOURCE IN LISTS FE7_NATIVE_DATA_SOURCES)
+    foreach(FE7_SOURCE IN LISTS FE7_NATIVE_SEED_SOURCES)
         if(NOT EXISTS "${FE7_SOURCE}")
             message(FATAL_ERROR "Required FE7 data-slice source is missing: ${FE7_SOURCE}")
         endif()
     endforeach()
 
-    add_library(fe7_engine_data OBJECT ${FE7_NATIVE_DATA_SOURCES})
-    set_target_properties(fe7_engine_data PROPERTIES
+    add_library(fe7_engine_seed OBJECT ${FE7_NATIVE_SEED_SOURCES})
+    set_target_properties(fe7_engine_seed PROPERTIES
         C_STANDARD 11
         C_STANDARD_REQUIRED YES
         C_EXTENSIONS YES
         POSITION_INDEPENDENT_CODE YES
     )
-    target_compile_definitions(fe7_engine_data PRIVATE FE7_NATIVE_PORT=1)
-    target_compile_options(fe7_engine_data PRIVATE -Wall -Wextra -fno-common)
-    target_include_directories(fe7_engine_data PRIVATE
+    target_compile_definitions(fe7_engine_seed PRIVATE FE7_NATIVE_PORT=1)
+    target_compile_options(fe7_engine_seed PRIVATE -Wall -Wextra -fno-common)
+    target_include_directories(fe7_engine_seed PRIVATE
         "${FE7_SOURCE_ROOT}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-    target_sources(fe7native PRIVATE $<TARGET_OBJECTS:fe7_engine_data>)
-    target_compile_definitions(fe7native PRIVATE FE7_ENGINE_SOURCE_DATA_LINKED=1)
+    target_sources(fe7native PRIVATE $<TARGET_OBJECTS:fe7_engine_seed>)
+    target_compile_definitions(fe7native PRIVATE FE7_ENGINE_SOURCE_SEED_LINKED=1)
 
     # Compile the adapted AgbMain entrypoint as a standalone object. It is not
     # linked into fe7native yet because its runtime/graphics/audio dependencies
