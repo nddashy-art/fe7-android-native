@@ -124,6 +124,19 @@ void TestBitmapModes345() {
     assert(frame[Pixel(160, 127)] == 0xFF000000u);
     assert(frame[Pixel(239, 159)] == 0xFF000000u);
 
+    // Bitmap modes reserve VRAM through 0x13FFF for the framebuffer;
+    // OBJ tile data starts at 0x14000 rather than the tiled-mode 0x10000.
+    Write16(memory, kDisplayControl,
+        4u | (1u << 4) | (1u << 6) | (1u << 10) | (1u << 12));
+    Write16(memory, kPalette + 2u * (256u + 2u), 0x03E0u);
+    for (unsigned i = 0; i < 32u; ++i)
+        assert(memory.Write8(kVram + 0x14000u + i, 0x22u));
+    Write16(memory, kOam, 20u);
+    Write16(memory, kOam + 2u, 10u);
+    Write16(memory, kOam + 4u, 0u);
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(10, 20)] == 0xFF00FF00u);
+
     // If BG2 is disabled in a bitmap mode, the framebuffer does not draw.
     Write16(memory, kDisplayControl, 5u | (1u << 4));
     assert(ppu.RenderFrame(frame.data(), frame.size()));
