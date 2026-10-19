@@ -1,23 +1,55 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(fe7native LANGUAGES C CXX ASM)
 
-set(MGBA_CORE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/mgba_libretro.so")
-if(NOT EXISTS "${MGBA_CORE_PATH}")
-    message(FATAL_ERROR "Missing mGBA core: ${MGBA_CORE_PATH}. Run the pinned mGBA build step before Gradle.")
-endif()
-
 # Optional path to the user's own extracted FE7 decompilation. The source tree
 # is deliberately not copied into this repository and no ROM/assets are bundled.
 set(FE7_SOURCE_ROOT "" CACHE PATH "Path to extracted fe7_us-main source tree")
 
-add_library(mgba_libretro SHARED IMPORTED)
-set_target_properties(mgba_libretro PROPERTIES IMPORTED_LOCATION "${MGBA_CORE_PATH}")
+# Keep the software GBA compatibility/runtime layer as a separate target.
+# This lets us compile and test memory, BIOS helpers, PPU, DMA, IRQ and timing
+# without loading mGBA. It is not a CPU or complete FE7 engine yet.
+add_library(fe7runtime STATIC
+    gba_bios_compat.cpp
+    gba_memory.cpp
+    gba_ppu.cpp
+    gba_port.cpp
+    gba_bios_services.cpp
+    gba_dma.cpp
+    gba_irq.cpp
+    gba_frame_clock.cpp
+    fe7_engine_startup.cpp
+)
+target_compile_features(fe7runtime PUBLIC cxx_std_17)
+target_compile_options(fe7runtime PRIVATE -Wall -Wextra)
+target_include_directories(fe7runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+set_target_properties(fe7runtime PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-add_library(fe7native SHARED fe7native.cpp gba_bios_compat.cpp gba_memory.cpp gba_ppu.cpp gba_port.cpp gba_bios_services.cpp gba_dma.cpp gba_irq.cpp gba_frame_clock.cpp fe7_engine_startup.cpp)
-target_compile_features(fe7native PRIVATE cxx_std_17)
-target_compile_options(fe7native PRIVATE -Wall -Wextra)
-target_include_directories(fe7native PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(fe7native mgba_libretro)
+# The existing playable frontend is optional at CMake level. Android Gradle
+# builds it by default; host-side tests can build fe7runtime without mGBA.
+option(FE7_BUILD_ANDROID_FRONTEND "Build the Android JNI frontend backed by mGBA" ${ANDROID})
+if(FE7_BUILD_ANDROID_FRONTEND)
+    set(MGBA_CORE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/mgba_libretro.so")
+    if(NOT EXISTS "${MGBA_CORE_PATH}")
+        message(FATAL_ERROR "Missing mGBA core: ${MGBA_CORE_PATH}. Run the pinned mGBA build step before Gradle.")
+    endif()
+    add_library(mgba_libretro SHARED IMPORTED)
+    set_target_properties(mgba_libretro PROPERTIES IMPORTED_LOCATION "${MGBA_CORE_PATH}")
+
+    add_library(fe7native SHARED fe7native.cpp)
+    target_compile_features(fe7native PRIVATE cxx_std_17)
+    target_compile_options(fe7native PRIVATE -Wall -Wextra)
+    target_include_directories(fe7native PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(fe7native PRIVATE fe7runtime mgba_libretro)
+endif()
+
+include(CTest)
+if(BUILD_TESTING AND NOT ANDROID)
+    add_executable(fe7_native_runtime_smoke tests/native_runtime_smoke.cpp)
+    target_compile_features(fe7_native_runtime_smoke PRIVATE cxx_std_17)
+    target_include_directories(fe7_native_runtime_smoke PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(fe7_native_runtime_smoke PRIVATE fe7runtime)
+    add_test(NAME fe7_native_runtime_smoke COMMAND fe7_native_runtime_smoke)
+endif()
 
 if(FE7_SOURCE_ROOT)
     get_filename_component(FE7_SOURCE_ROOT "${FE7_SOURCE_ROOT}" REALPATH)
@@ -65,8 +97,10 @@ if(FE7_SOURCE_ROOT)
         "${FE7_SOURCE_ROOT}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-    target_sources(fe7native PRIVATE $<TARGET_OBJECTS:fe7_engine_seed>)
-    target_compile_definitions(fe7native PRIVATE FE7_ENGINE_SOURCE_SEED_LINKED=1)
+    if(TARGET fe7native)
+        target_sources(fe7native PRIVATE $<TARGET_OBJECTS:fe7_engine_seed>)
+        target_compile_definitions(fe7native PRIVATE FE7_ENGINE_SOURCE_SEED_LINKED=1)
+    endif()
 
     # Compile the adapted AgbMain entrypoint as a standalone object. It is not
     # linked into fe7native yet because its runtime/graphics/audio dependencies
@@ -85,7 +119,9 @@ if(FE7_SOURCE_ROOT)
         "${FE7_SOURCE_ROOT}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-    add_dependencies(fe7native fe7_engine_startup_probe)
+    if(TARGET fe7native)
+        add_dependencies(fe7native fe7_engine_startup_probe)
+    endif()
 
     # Additional real C engine/service modules are compiled for every Android
     # ABI, but held out of the shared-library link until their dependencies are
@@ -116,7 +152,9 @@ if(FE7_SOURCE_ROOT)
         "${FE7_SOURCE_ROOT}/include"
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
-    add_dependencies(fe7native fe7_engine_service_probe)
+    if(TARGET fe7native)
+        add_dependencies(fe7native fe7_engine_service_probe)
+    endif()
 
     # The original assembly is buildable as ARMv7 objects for the 32-bit
     # Android ABI. Keep this as a compile probe for now: the GBA absolute
@@ -140,7 +178,9 @@ if(FE7_SOURCE_ROOT)
             "${FE7_SOURCE_ROOT}/include"
             "${CMAKE_CURRENT_SOURCE_DIR}"
         )
-        add_dependencies(fe7native fe7_engine_m4a_probe)
+        if(TARGET fe7native)
+            add_dependencies(fe7native fe7_engine_m4a_probe)
+        endif()
 
         find_package(Python3 COMPONENTS Interpreter REQUIRED)
         get_filename_component(FE7_NATIVE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
@@ -182,7 +222,9 @@ if(FE7_SOURCE_ROOT)
             "${FE7_SOURCE_ROOT}/include"
         )
         set_target_properties(fe7_engine_asm_probe PROPERTIES POSITION_INDEPENDENT_CODE YES)
-        add_dependencies(fe7native fe7_engine_asm_probe)
+        if(TARGET fe7native)
+            add_dependencies(fe7native fe7_engine_asm_probe)
+        endif()
         message(STATUS "FE7 ARMv7 sound/assembly probes enabled: m4a.c plus 8 original ASM units compile only; they are not linked or executed.")
     endif()
 
