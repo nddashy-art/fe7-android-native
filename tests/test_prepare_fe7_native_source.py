@@ -36,8 +36,18 @@ class PrepareSourceAdapterTest(unittest.TestCase):
                 '    VerifySramFast = (void *)((uptr)VerifySramFastBuf + 1);\n\n'
                 '    REG_WAITCNT = (REG_WAITCNT & ~3) | 3;\n}\n')
             (source / "gbasram.c").write_text(original_sram, encoding="utf-8")
+            original_interrupt = (
+                '#include "prelude.h"\n#include "gbaio.h"\n#include "gbasvc.h"\n\n'
+                'extern void IntrMain(void);\nvoid DummyIntFunc(void);\n'
+                'extern void (*IntrFuncTable[])(void);\nextern u32 IntrMainRam[0x200];\n'
+                'void IrqInit(void) { IntrFuncTable[0] = DummyIntFunc; }\n'
+                'void DummyIntFunc(void) {}\n'
+                'void SetIrqFunc(int num, void (*func)(void)) { IntrFuncTable[num] = func; }\n'
+            )
+            (source / "interrupt.c").write_text(original_interrupt, encoding="utf-8")
             original_gbaio = (include / "gbaio.h").read_bytes()
             original_sram_bytes = (source / "gbasram.c").read_bytes()
+            original_interrupt_bytes = (source / "interrupt.c").read_bytes()
 
             first = subprocess.run([sys.executable, str(PATCHER), str(root)],
                                    check=True, capture_output=True, text=True)
@@ -57,7 +67,11 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             self.assertIn("#else\n    u16 * src;", sram_patched)
             self.assertEqual((include / "gbaio.h.fe7native.bak").read_bytes(), original_gbaio)
             self.assertEqual((source / "gbasram.c.fe7native.bak").read_bytes(), original_sram_bytes)
-            self.assertIn("(8 edits)", first.stdout)
+            interrupt_patched = (source / "interrupt.c").read_text(encoding="utf-8")
+            self.assertIn("fe7_gba_dispatch_pending_irqs", interrupt_patched)
+            self.assertIn("#else\nextern void IntrMain(void);", interrupt_patched)
+            self.assertEqual((source / "interrupt.c.fe7native.bak").read_bytes(), original_interrupt_bytes)
+            self.assertIn("(9 edits)", first.stdout)
             self.assertIn("(0 edits)", second.stdout)
             self.assertTrue((include / "gba_port.h").is_file())
 
