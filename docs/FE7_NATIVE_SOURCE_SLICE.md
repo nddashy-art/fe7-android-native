@@ -6,7 +6,7 @@ This adds the first build path that compiles and links translation units from th
 
 The optional `fe7_engine_data` object target builds these original source files from a local `fe7_us-main` tree:
 
-- `util.c`, `text.c`, `face.c`, `unit.c`, `bm.c`, `map.c`
+- `util.c`, `text.c`, `face.c`, `hardware.c`, `proc.c`, `unit.c`, `bm.c`, `map.c`
 - `sprite.c`, `icon.c`, `msg.c`, `debug_text.c`, `banim_sprite.c`
 
 They define engine-facing global state and data tables; none needs a baserom to compile. The object files are linked into `libfe7native.so`, rather than merely being syntax-checked in a disconnected project.
@@ -23,7 +23,7 @@ python3 scripts/test_fe7_native_data_slice.py /tmp/fe7-us-native
 ./gradlew assembleDebug -Pfe7SourceRoot=/tmp/fe7-us-native
 ```
 
-Use an absolute path for `fe7SourceRoot`. The smoke-test script compiles the 11 data-only C files with the host compiler, verifies they link into a shared object, and separately compiles adapted `src/main.c` to an object. Android CMake repeats these steps with the NDK, adds the data objects to the APK's native library, and keeps the startup object out of the link until its dependencies are ported.
+Use an absolute path for `fe7SourceRoot`. The smoke-test script compiles the 13 data-only C files with the host compiler, verifies they link into a shared object, and separately compiles adapted `src/main.c` to an object. Android CMake repeats these steps with the NDK, adds the data objects to the APK's native library, and keeps the startup object out of the link until its dependencies are ported.
 
 ## What this milestone proves — and does not prove
 
