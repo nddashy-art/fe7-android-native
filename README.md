@@ -38,6 +38,10 @@ An experimental effort to bring a **user-supplied, legally obtained Fire Emblem:
 - [ ] Multiplayer design and implementation
 - [ ] Mod/OC extension design and implementation
 
+## Emulator and licenses
+
+The Android build script pins mGBA to upstream commit `9660a668f2093cb4aba5983f52bebf8878dc5b8b` and builds the libretro core without bundling any ROM or BIOS. mGBA is licensed under MPL-2.0; its license and pinned commit are included in the app assets. The vendored `libretro.h` API header retains its separate MIT license notice.
+
 ## Development notes
 
 See [PORTING_PLAN.md](docs/PORTING_PLAN.md) for the staged technical plan and [DECOMPILATION_AUDIT.md](docs/DECOMPILATION_AUDIT.md) for findings from the supplied source archive. The priority is to get a real, reproducible single-player boot first. Multiplayer and character mods depend on understanding and adapting the original game state and should not be represented as available before they work.
