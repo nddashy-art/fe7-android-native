@@ -20,6 +20,16 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Check out FE7 US source (source only; no ROM/assets)
+        uses: actions/checkout@v4
+        with:
+          repository: StanHash/fe7_us
+          ref: 5c8b3c5e254e00f0f3458b9772c27e1a5a326e3b
+          path: fe7_us-main
+
+      - name: Prepare FE7 source compatibility layer
+        run: python3 scripts/prepare_fe7_native_source.py "$GITHUB_WORKSPACE/fe7_us-main"
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -44,8 +54,8 @@ jobs:
       - name: Build pinned mGBA core for Android ABIs
         run: bash tools/build_mgba_android.sh
 
-      - name: Build debug APK
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Build debug APK with the FE7 source slice enabled
+        run: gradle --no-daemon :app:assembleDebug "-Pfe7SourceRoot=$GITHUB_WORKSPACE/fe7_us-main"
 
       - name: Upload prototype APK
         uses: actions/upload-artifact@v4
