@@ -31,6 +31,9 @@ private:
     bool RenderTextBackgroundPixel(unsigned bg, unsigned x, unsigned y,
                                    std::uint32_t* color,
                                    std::uint16_t* rank) const;
+    bool RenderAffineBackgroundPixel(unsigned bg, unsigned x, unsigned y,
+                                     std::uint32_t* color,
+                                     std::uint16_t* rank) const;
     void RenderObjects();
     void RenderObject(unsigned oam_index);
     bool ReadTextTilePixel(unsigned bg, std::uint16_t control,
