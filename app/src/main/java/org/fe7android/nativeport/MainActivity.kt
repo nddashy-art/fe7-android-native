@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
-import android.view.View
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.ViewGroup
@@ -227,11 +226,13 @@ class MainActivity : Activity() {
             setOnTouchListener { _, event ->
                 val mask = 1 shl retroButtonId
                 when (event.actionMasked) {
-                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                        nativeSetButtons(currentPressedButtons or mask)
+                    MotionEvent.ACTION_DOWN -> {
+                        currentPressedButtons = currentPressedButtons or mask
+                        nativeSetButtons(currentPressedButtons)
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        nativeSetButtons(currentPressedButtons and mask.inv())
+                        currentPressedButtons = currentPressedButtons and mask.inv()
+                        nativeSetButtons(currentPressedButtons)
                     }
                 }
                 true
