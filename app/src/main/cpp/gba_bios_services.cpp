@@ -10,11 +10,6 @@
 #include <limits>
 #include <thread>
 
-namespace {
-using Callback = void (*)(void);
-std::atomic<Callback> g_vblank_callback{nullptr};
-std::atomic<Callback> g_soft_reset_callback{nullptr};
-
 struct BgAffineSetSrc {
     std::int32_t tex_x, tex_y;
     std::int16_t scr_x, scr_y, sx, sy;
@@ -28,6 +23,11 @@ struct ObjAffineSetSrc {
     std::int16_t x_scale, y_scale;
     std::uint16_t rotation;
 };
+
+namespace {
+using Callback = void (*)(void);
+std::atomic<Callback> g_vblank_callback{nullptr};
+std::atomic<Callback> g_soft_reset_callback{nullptr};
 
 const std::array<std::int16_t, 256>& SinTable() {
     static const auto table = [] {
@@ -94,7 +94,7 @@ extern "C" std::uint16_t ArcTan2(std::int16_t x, std::int16_t y) {
     return static_cast<std::uint16_t>(static_cast<std::int32_t>(std::lround(angle)));
 }
 
-extern "C" void BgAffineSet(const void* source, void* destination, std::int32_t count) {
+extern "C" void BgAffineSet(const struct BgAffineSetSrc* source, struct BgAffineSetDst* destination, std::int32_t count) {
     if (count <= 0 || source == nullptr || destination == nullptr) return;
     const auto src_address = reinterpret_cast<std::uintptr_t>(source);
     const auto dst_address = reinterpret_cast<std::uintptr_t>(destination);
@@ -128,7 +128,7 @@ extern "C" void BgAffineSet(const void* source, void* destination, std::int32_t 
     }
 }
 
-extern "C" void ObjAffineSet(const void* source, void* destination, std::int32_t count, std::int32_t offset) {
+extern "C" void ObjAffineSet(const struct ObjAffineSetSrc* source, void* destination, std::int32_t count, std::int32_t offset) {
     if (count <= 0 || offset <= 0 || source == nullptr || destination == nullptr) return;
     const std::size_t src_count = static_cast<std::size_t>(count);
     const std::size_t step = static_cast<std::size_t>(offset);
@@ -209,6 +209,6 @@ extern "C" void SoundBiasReset(void) {
 extern "C" void SoundBiasSet(void) {
     if (auto* bias = static_cast<volatile std::uint16_t*>(fe7_gba_io_pointer(0x04000088u, 2))) *bias = 0x0200u;
 }
-extern "C" void MultiBoot(const void* info) {
+extern "C" void MultiBoot(const struct MultiBootInfo* info) {
     (void)info; // Link-cable multiboot is unsupported by this Android runtime for now.
 }
