@@ -28,14 +28,15 @@ bool CpuSet(const void* source, void* destination, std::uint32_t control) {
         for (std::size_t offset = 0; offset < bytes; offset += unit)
             std::memcpy(dst + offset, src, unit);
     } else {
-        std::memmove(dst, src, bytes);
+        // Forward unit-by-unit copy mirrors the BIOS-style loop, including the
+        // observable behavior when source/destination overlap.
+        for (std::size_t offset = 0; offset < bytes; offset += unit)
+            std::memcpy(dst + offset, src + offset, unit);
     }
     return true;
 }
 
 bool CpuFastSet(const void* source, void* destination, std::uint32_t control) {
-    // Project Picori's BIOS compatibility layer and FE7's control word both
-    // treat the low 21 bits as an exact count of 32-bit words.
     const std::size_t words = control & kTransferCountMask;
     std::size_t bytes = 0;
     if (!CheckedBytes(words, sizeof(std::uint32_t), &bytes) ||
