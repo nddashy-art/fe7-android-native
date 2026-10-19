@@ -5,6 +5,10 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.MotionEvent
+import android.view.View
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.ViewGroup
@@ -22,6 +26,10 @@ import java.util.Locale
  */
 class MainActivity : Activity() {
     private lateinit var romStatus: TextView
+    private val frameHandler = Handler(Looper.getMainLooper())
+    private var gameBitmap: Bitmap? = null
+    private var gameImage: ImageView? = null
+    private var gameLoopActive = false
 
     companion object {
         private const val REQUEST_OPEN_ROM = 4107
@@ -32,6 +40,8 @@ class MainActivity : Activity() {
         private const val MIN_GBA_SIZE = GBA_HEADER_SIZE
         private const val TEST_FRAME_WIDTH = 240
         private const val TEST_FRAME_HEIGHT = 160
+        private const val GAME_FRAME_WIDTH = 240
+        private const val GAME_FRAME_HEIGHT = 160
     }
 
     init {
@@ -41,15 +51,17 @@ class MainActivity : Activity() {
     private external fun nativeGetBridgeStatus(): String
     private external fun nativeInspectGbaHeader(header: ByteArray): String
     private external fun nativeCreateTestFrame(): IntArray
+    private external fun nativeStartGame(romPath: String): String
+    private external fun nativeRunFrame(): IntArray
+    private external fun nativeSetButtons(buttons: Int)
+    private external fun nativeStopGame()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showLauncher()
     }
 
-    private fun showLauncher() {
-
-        val root = LinearLayout(this).apply {
+    private fun showLauncher() {\n        gameLoopActive = false\n        frameHandler.removeCallbacksAndMessages(null)\n\n        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(28, 24, 28, 24)
@@ -76,7 +88,7 @@ class MainActivity : Activity() {
             setOnClickListener { openRomPicker() }
         }
 
-        val videoTestButton = Button(this).apply {
+        val startGameButton = Button(this).apply {\n            text = "Iniciar FE7 (motor mGBA)"\n            setOnClickListener { startSelectedGame() }\n        }\n\n        val videoTestButton = Button(this).apply {
             text = "Probar pantalla nativa"
             setOnClickListener { showNativeVideoTest() }
         }
@@ -105,6 +117,152 @@ class MainActivity : Activity() {
 
         setContentView(root)
         restoreSavedRom()
+    }
+
+
+    private fun startSelectedGame() {
+        val uriText = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_ROM_URI, null)
+        if (uriText == null) {
+            romStatus.text = "Primero selecciona tu archivo .gba."
+            return
+        }
+
+        try {
+            val localRom = java.io.File(cacheDir, "selected-fe7.gba")
+            contentResolver.openInputStream(Uri.parse(uriText))?.use { input ->
+                localRom.outputStream().use { output -> input.copyTo(output) }
+            } ?: run {
+                romStatus.text = "No se pudo leer el archivo seleccionado."
+                return
+            }
+
+            val error = nativeStartGame(localRom.absolutePath)
+            if (error.isNotEmpty()) {
+                romStatus.text = "No se pudo iniciar el juego: $error"
+                return
+            }
+            showGameScreen()
+        } catch (error: Exception) {
+            romStatus.text = "No se pudo preparar la ROM: ${error.javaClass.simpleName}"
+        }
+    }
+
+    private fun showGameScreen() {
+        frameHandler.removeCallbacksAndMessages(null)
+        currentPressedButtons = 0
+        nativeSetButtons(0)
+        gameLoopActive = true
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(10, 8, 10, 8)
+            setBackgroundColor(0xFF10151E.toInt())
+        }
+        val title = TextView(this).apply {
+            text = "FIRE EMBLEM · mGBA"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFFFD98A.toInt())
+        }
+        val image = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setBackgroundColor(0xFF05070B.toInt())
+            contentDescription = "Pantalla de Fire Emblem ejecutada por mGBA"
+        }
+        val bitmap = Bitmap.createBitmap(GAME_FRAME_WIDTH, GAME_FRAME_HEIGHT, Bitmap.Config.ARGB_8888)
+        gameBitmap = bitmap
+        gameImage = image
+        image.setImageBitmap(bitmap)
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+        }
+        val directions = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+        }
+        addGameButton(directions, "↑", 4)
+        addGameButton(directions, "↓", 5)
+        addGameButton(directions, "←", 6)
+        addGameButton(directions, "→", 7)
+        val actions = LinearLayout(this).apply {
+            gravity = Gravity.CENTER
+        }
+        addGameButton(actions, "B", 0)
+        addGameButton(actions, "A", 8)
+        addGameButton(actions, "SELECT", 2)
+        addGameButton(actions, "START", 3)
+        controls.addView(directions, layoutParams(bottom = 2))
+        controls.addView(actions, layoutParams(bottom = 2))
+
+        val back = Button(this).apply {
+            text = "Detener juego y volver"
+            setOnClickListener {
+                gameLoopActive = false
+                frameHandler.removeCallbacksAndMessages(null)
+                nativeSetButtons(0)
+                nativeStopGame()
+                gameBitmap = null
+                gameImage = null
+                showLauncher()
+            }
+        }
+
+        root.addView(title, layoutParams(bottom = 4))
+        root.addView(image, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        root.addView(controls, layoutParams(bottom = 2))
+        root.addView(back, layoutParams())
+        setContentView(root)
+        renderGameFrame()
+    }
+
+    private fun addGameButton(parent: LinearLayout, label: String, retroButtonId: Int) {
+        val button = Button(this).apply {
+            text = label
+            textSize = if (label.length > 2) 10f else 14f
+            setPadding(4, 2, 4, 2)
+            setOnTouchListener { _, event ->
+                val mask = 1 shl retroButtonId
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
+                        nativeSetButtons(currentPressedButtons or mask)
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        nativeSetButtons(currentPressedButtons and mask.inv())
+                    }
+                }
+                true
+            }
+        }
+        parent.addView(button, LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f
+        ).apply {
+            marginStart = 2
+            marginEnd = 2
+        })
+    }
+
+    private var currentPressedButtons: Int = 0
+
+    private fun renderGameFrame() {
+        if (!gameLoopActive) return
+        try {
+            val pixels = nativeRunFrame()
+            val bitmap = gameBitmap
+            val image = gameImage
+            if (pixels.size == GAME_FRAME_WIDTH * GAME_FRAME_HEIGHT &&
+                bitmap != null && image != null) {
+                bitmap.setPixels(pixels, 0, GAME_FRAME_WIDTH, 0, 0, GAME_FRAME_WIDTH, GAME_FRAME_HEIGHT)
+                image.invalidate()
+            }
+        } catch (_: Exception) {
+            gameLoopActive = false
+            return
+        }
+        frameHandler.postDelayed({ renderGameFrame() }, 16L)
     }
 
     private fun showNativeVideoTest() {
