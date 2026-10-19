@@ -89,10 +89,15 @@ Java_org_fe7android_nativeport_MainActivity_nativeCreateTestFrame(
             }
             if (TestCircle(x, y, 195, 29, 13)) color = TestArgb(255, 218, 111);
 
-            const int ridgeLeft = 108 - std::abs(x - 66) * 3 / 2;
-            const int ridgeRight = 119 - std::abs(x - 154) * 5 / 4;
-            if ((y >= ridgeLeft && y < 112) || (y >= ridgeRight && y < 125)) {
-                color = TestArgb(72, 105, 124);
+            // Peaks rise toward their centers; the old formula inverted them
+            // and painted almost the entire sky as a mountain.
+            const int ridgeLeft = 55 + std::abs(x - 62) * 3 / 4;
+            const int ridgeRight = 68 + std::abs(x - 160) * 2 / 3;
+            if (x >= 2 && x <= 151 && y >= ridgeLeft && y < 112) {
+                color = TestArgb(75, 112, 126);
+            }
+            if (x >= 70 && x <= 238 && y >= ridgeRight && y < 112) {
+                color = TestArgb(88, 124, 135);
             }
             if (y >= 111) color = TestArgb(60, 132, 75);
             if (y >= 127 && (x + y) % 17 < 3) color = TestArgb(105, 171, 83);
