@@ -2,11 +2,13 @@ package org.fe7android.nativeport
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.view.Gravity
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -28,6 +30,8 @@ class MainActivity : Activity() {
         private const val KEY_ROM_NAME = "selected_rom_name"
         private const val GBA_HEADER_SIZE = 0xB0
         private const val MIN_GBA_SIZE = GBA_HEADER_SIZE
+        private const val TEST_FRAME_WIDTH = 240
+        private const val TEST_FRAME_HEIGHT = 160
     }
 
     init {
@@ -36,6 +40,7 @@ class MainActivity : Activity() {
 
     private external fun nativeGetBridgeStatus(): String
     private external fun nativeInspectGbaHeader(header: ByteArray): String
+    private external fun nativeCreateTestFrame(): IntArray
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,6 +72,11 @@ class MainActivity : Activity() {
             setOnClickListener { openRomPicker() }
         }
 
+        val videoTestButton = Button(this).apply {
+            text = "Probar pantalla nativa"
+            setOnClickListener { showNativeVideoTest() }
+        }
+
         romStatus = TextView(this).apply {
             textSize = 14f
             gravity = Gravity.CENTER
@@ -84,12 +94,68 @@ class MainActivity : Activity() {
 
         root.addView(title, layoutParams(bottom = 22))
         root.addView(description, layoutParams(bottom = 18))
-        root.addView(chooseButton, layoutParams(bottom = 16))
+        root.addView(chooseButton, layoutParams(bottom = 8))
+        root.addView(videoTestButton, layoutParams(bottom = 8))
         root.addView(romStatus, layoutParams(bottom = 18))
         root.addView(warning, layoutParams())
 
         setContentView(root)
         restoreSavedRom()
+    }
+
+    private fun showNativeVideoTest() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(12, 8, 12, 8)
+            setBackgroundColor(0xFF10151E.toInt())
+        }
+
+        val title = TextView(this).apply {
+            text = "PRUEBA DE VÍDEO NATIVO · 240 × 160"
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFFFD98A.toInt())
+        }
+
+        val image = ImageView(this).apply {
+            setBackgroundColor(0xFF05070B.toInt())
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = "Fotograma gráfico de prueba generado por C++"
+        }
+
+        val status = TextView(this).apply {
+            textSize = 12f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFF1F3F8.toInt())
+        }
+
+        val backButton = Button(this).apply {
+            text = "Volver al selector"
+            setOnClickListener { showLauncher() }
+        }
+
+        try {
+            val pixels = nativeCreateTestFrame()
+            if (pixels.size == TEST_FRAME_WIDTH * TEST_FRAME_HEIGHT) {
+                image.setImageBitmap(
+                    Bitmap.createBitmap(
+                        pixels, TEST_FRAME_WIDTH, TEST_FRAME_HEIGHT, Bitmap.Config.ARGB_8888
+                    )
+                )
+                status.text = "Fotograma recibido desde C++ y dibujado en Android.\nEsto valida el transporte de imagen; no es el juego."
+            } else {
+                status.text = "La prueba devolvió un tamaño inesperado (${pixels.size})."
+            }
+        } catch (error: Exception) {
+            status.text = "No se pudo crear el fotograma: ${error.javaClass.simpleName}"
+        }
+
+        root.addView(title, layoutParams(bottom = 4))
+        root.addView(image, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        root.addView(status, layoutParams(bottom = 2))
+        root.addView(backButton, layoutParams())
+        setContentView(root)
     }
 
     private fun layoutParams(bottom: Int = 0) =
