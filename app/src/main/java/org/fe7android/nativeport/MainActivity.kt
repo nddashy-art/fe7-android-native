@@ -401,7 +401,7 @@ class MainActivity : Activity() {
         } else {
             "No se pudo confirmar que sea Fire Emblem; se guardó de todos modos."
         }
-        romStatus.text = "Archivo: ${displayName}\nTítulo: ${header.title.ifBlank { "(vacío)" }}\nCódigo: ${header.gameCode.ifBlank { "(vacío)" }} · $sizeText\n$identity\nGuardado localmente; aún no se ejecuta."
+        romStatus.text = "Archivo: ${displayName}\nTítulo: ${header.title.ifBlank { "(vacío)" }}\nCódigo: ${header.gameCode.ifBlank { "(vacío)" }} · $sizeText\n$identity\nROM seleccionada y lista para iniciar con mGBA."
     }
 
     private data class GbaHeader(
@@ -461,7 +461,7 @@ class MainActivity : Activity() {
             try {
                 val header = readGbaHeader(Uri.parse(uriText))
                 if (header != null) {
-                    "ROM guardada: $name\nTítulo: ${header.title.ifBlank { "(vacío)" }} · Código: ${header.gameCode.ifBlank { "(vacío)" }}\nEl motor aún no la ejecuta."
+                    "ROM guardada: $name\nTítulo: ${header.title.ifBlank { "(vacío)" }} · Código: ${header.gameCode.ifBlank { "(vacío)" }}\nPulsa «Iniciar FE7 (motor mGBA)» para jugar."
                 } else {
                     "El archivo guardado ya no parece legible. Selecciónalo otra vez."
                 }
