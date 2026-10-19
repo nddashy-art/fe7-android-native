@@ -184,6 +184,9 @@ void MemoryBus::Reset(bool clear_ewram) {
     palette_.fill(0);
     vram_.fill(0);
     oam_.fill(0);
+    // Start OBJ entries hidden until the game populates its OAM buffer.
+    for (std::size_t offset = 1; offset < oam_.size(); offset += 8)
+        oam_[offset] = 0x02;  // Attribute 0 bit 9 (non-affine OBJ disable).
     // SRAM and attached ROM intentionally survive reset.
 }
 
