@@ -14,6 +14,9 @@ void fe7_gba_set_vblank_callback(void (*callback)(void));
 void fe7_gba_set_soft_reset_callback(void (*callback)(void));
 volatile void* fe7_gba_io_pointer(uint32_t address, size_t length);
 void* fe7_gba_resolve_pointer(uintptr_t address_or_host_pointer, size_t length, int write_access);
+void fe7_gba_dma_set(unsigned channel, const void* source, void* destination, uint32_t control);
+void fe7_gba_dma_on_vblank(void);
+void fe7_gba_dma_on_hblank(unsigned scanline);
 void** fe7_gba_interrupt_vector_slot(void);
 
 struct BgAffineSetSrc;
