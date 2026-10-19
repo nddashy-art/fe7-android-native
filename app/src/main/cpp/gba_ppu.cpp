@@ -435,6 +435,7 @@ void PpuRenderer::RenderAffineObject(unsigned oam_index) {
     };
 
     const bool color256 = (attr0 & kOamAttr0Color256) != 0;
+    const unsigned obj_vram_offset = ((display_control & 7u) >= 3u) ? 0x14000u : 0x10000u;
     const unsigned tile_base = color256 ? ((attr2 & 0x3FFu) & ~1u) : (attr2 & 0x3FFu);
     const unsigned tile_bytes = color256 ? 64u : 32u;
     const unsigned tiles_wide = width / 8u;
