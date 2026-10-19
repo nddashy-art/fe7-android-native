@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile and link the first ROM-independent slice of FE7's own C source."""
+"""Compile and link the first low-dependency slice of FE7's own C source."""
 from __future__ import annotations
 
 import os
