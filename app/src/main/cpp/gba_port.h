@@ -12,6 +12,8 @@ extern "C" {
 int fe7_gba_attach_rom(const uint8_t* data, size_t size);
 void fe7_gba_detach_rom(void);
 void fe7_gba_reset(int clear_ewram);
+void fe7_gba_set_vblank_callback(void (*callback)(void));
+void fe7_gba_set_soft_reset_callback(void (*callback)(void));
 
 // Resolve GBA virtual addresses to backing storage. The IO pointer preserves
 // the lvalue semantics expected by FE7's REG(type, address) macro.
@@ -19,11 +21,23 @@ volatile void* fe7_gba_io_pointer(uint32_t address, size_t length);
 void* fe7_gba_resolve_pointer(uintptr_t address_or_host_pointer,
                               size_t length, int write_access);
 
-// FE7-compatible BIOS memory-service entry points replacing the ARM7TDMI SWI stubs.
+// FE7-compatible BIOS service entry points that replace GBA SWI assembly.
 void CpuSet(const void* source, void* destination, uint32_t control);
 void CpuFastSet(const void* source, void* destination, uint32_t control);
 void LZ77UnComp8bit(const void* source, void* destination);
 void LZ77UnComp16bit(const void* source, void* destination);
+int32_t Div(int32_t numerator, int32_t denominator);
+int32_t DivRem(int32_t numerator, int32_t denominator);
+uint16_t Sqrt(uint32_t value);
+uint16_t ArcTan2(int16_t x, int16_t y);
+void BgAffineSet(const void* source, void* destination, int32_t count);
+void ObjAffineSet(const void* source, void* destination, int32_t count, int32_t offset);
+void RegisterRamReset(uint32_t flags);
+void SoftReset(uint32_t flags);
+void VBlankIntrWait(void);
+void SoundBiasReset(void);
+void SoundBiasSet(void);
+void MultiBoot(const void* info);
 
 #ifdef __cplusplus
 }
