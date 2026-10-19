@@ -34,6 +34,8 @@ if(FE7_SOURCE_ROOT)
         "${FE7_SOURCE_ROOT}/src/util.c"
         "${FE7_SOURCE_ROOT}/src/text.c"
         "${FE7_SOURCE_ROOT}/src/face.c"
+        "${FE7_SOURCE_ROOT}/src/hardware.c"
+        "${FE7_SOURCE_ROOT}/src/proc.c"
         "${FE7_SOURCE_ROOT}/src/unit.c"
         "${FE7_SOURCE_ROOT}/src/bm.c"
         "${FE7_SOURCE_ROOT}/src/map.c"
@@ -83,7 +85,7 @@ if(FE7_SOURCE_ROOT)
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
     add_dependencies(fe7native fe7_engine_startup_probe)
-    message(STATUS "FE7 native source slice enabled: 11 linked data units plus AgbMain compile probe; game boot is not yet implemented.")
+    message(STATUS "FE7 native source slice enabled: 13 linked data units plus AgbMain compile probe; game boot is not yet implemented.")
 else()
     message(STATUS "FE7_SOURCE_ROOT not set: building the current Android shell/runtime only.")
 endif()
