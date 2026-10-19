@@ -22,6 +22,35 @@ def replace_once(path: Path, old: str, new: str) -> bool:
         shutil.copy2(path, backup)
     path.write_text(source.replace(old, new, 1), encoding="utf-8")
     return True
+def wrap_dma_macro(path: Path) -> bool:
+    """Swap FE7's register-programming DMA macro for the host software DMA hook."""
+    source = path.read_text(encoding="utf-8")
+    if "fe7_gba_dma_set((dma_num)" in source:
+        return False
+    lines = source.splitlines(keepends=True)
+    for start, line in enumerate(lines):
+        if line.startswith("#define DmaSet(dma_num, src, dst, control)"):
+            end = start
+            while lines[end].rstrip("\\r\\n").rstrip().endswith("\\\\"):
+                end += 1
+                if end >= len(lines):
+                    raise RuntimeError(f"unterminated DmaSet macro in {path}")
+            original = "".join(lines[start:end + 1])
+            replacement = (
+                "#ifdef FE7_NATIVE_PORT\\n"
+                "#define DmaSet(dma_num, src, dst, control) \\\\n"
+                "    fe7_gba_dma_set((dma_num), (const void *)(src), (void *)(dst), (u32)(control))\\n"
+                "#else\\n" + original +
+                "#endif // FE7_NATIVE_PORT\\n"
+            )
+            updated = "".join(lines[:start]) + replacement + "".join(lines[end + 1:])
+            backup = path.with_name(path.name + ".fe7native.bak")
+            if not backup.exists():
+                shutil.copy2(path, backup)
+            path.write_text(updated, encoding="utf-8")
+            return True
+    raise RuntimeError(f"could not locate DmaSet macro in {path}")
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -141,6 +170,7 @@ u32 (*COMMON(VerifySramFast) VerifySramFast)(void const * src, void * dst, u32 s
     REG_WAITCNT = (REG_WAITCNT & ~3) | 3;
 #endif
 }""")
+    changed += wrap_dma_macro(inc / "gbaio.h")
     print(f"Native memory-header adapter applied to {root} ({changed} edits).")
     print("Backups use the .fe7native.bak suffix. This is not a game-engine build or ROM boot test.")
     print("Compile with FE7_NATIVE_PORT defined and include app/src/main/cpp for the native API.")
