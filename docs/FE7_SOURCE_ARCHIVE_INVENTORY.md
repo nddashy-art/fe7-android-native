@@ -41,3 +41,10 @@ Do not bulk-add all `src/*.c` files to Android CMake yet. First define a small p
 The TMC audio audit is useful for considering a software MP2K backend behind FE7's game-facing sound API. It does not remove the need to audit FE7's own `m4a` driver, sound tables, instrument data, calling conventions, or license compatibility before reusing any code.
 
 Reference: https://github.com/nddashy-art/tmc/blob/master/docs/audio-pipeline-audit-2026-05-30.md
+
+
+## Additional port verification: Android ARMv7 assembly compile probe
+
+On an ARMv7 Android-target Clang assembler, these eight source units compile to object files without linking: `asm/code.s` (from a copy with one adjacent duplicate local-label declaration removed), `asm/code_1.s`, `asm/event.s`, `asm/fake_glue.s`, `src/armfunc.s`, `src/crt0.s`, `src/gbasvc.s`, and `src/sio_link_loader.s`. The duplicate-label normalizer is in `scripts/prepare_fe7_native_assembly.py`, with hermetic unit tests in `tests/test_prepare_fe7_native_assembly.py`.
+
+This is strictly a compile probe for the `armeabi-v7a` ABI, not a link/runtime result. The original objects rely on the GBA memory map and game data. `asm/data.s` / `asm/rodata.s` require `baserom.gba` via `.incbin`, and `src/m4a_1.s` still requires assembler compatibility work. No ROM or extracted game assets are added to the public repo or CI.
