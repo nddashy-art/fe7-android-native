@@ -10,6 +10,7 @@ extern "C" {
 int fe7_gba_attach_rom(const uint8_t* data, size_t size);
 void fe7_gba_detach_rom(void);
 void fe7_gba_reset(int clear_ewram);
+int fe7_gba_render_frame(uint32_t* output_rgba, size_t pixel_count);
 void fe7_gba_set_vblank_callback(void (*callback)(void));
 void fe7_gba_set_soft_reset_callback(void (*callback)(void));
 volatile void* fe7_gba_io_pointer(uint32_t address, size_t length);
