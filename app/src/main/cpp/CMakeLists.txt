@@ -185,7 +185,7 @@ if(FE7_SOURCE_ROOT)
         message(STATUS "FE7 ARMv7 sound/assembly probes enabled: m4a.c plus 8 original ASM units compile only; they are not linked or executed.")
     endif()
 
-    message(STATUS "FE7 native source slice enabled: 13 linked C units, 5 service compile probes, AgbMain compile probe; game boot is not yet implemented.")
+    message(STATUS "FE7 native source slice enabled: 13 linked C units plus separate engine/startup compile probes; game boot is not yet implemented.")
 else()
     message(STATUS "FE7_SOURCE_ROOT not set: building the current Android shell/runtime only.")
 endif()
