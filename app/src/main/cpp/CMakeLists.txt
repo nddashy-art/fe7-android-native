@@ -64,7 +64,26 @@ if(FE7_SOURCE_ROOT)
     )
     target_sources(fe7native PRIVATE $<TARGET_OBJECTS:fe7_engine_data>)
     target_compile_definitions(fe7native PRIVATE FE7_ENGINE_SOURCE_DATA_LINKED=1)
-    message(STATUS "FE7 native source slice enabled: 11 original C translation units; game boot is not yet implemented.")
+
+    # Compile the adapted AgbMain entrypoint as a standalone object. It is not
+    # linked into fe7native yet because its runtime/graphics/audio dependencies
+    # are not fully ported; keeping the object out of the link avoids claiming
+    # an engine boot when only source compatibility has been proven.
+    add_library(fe7_engine_startup_probe OBJECT "${FE7_SOURCE_ROOT}/src/main.c")
+    set_target_properties(fe7_engine_startup_probe PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS YES
+        POSITION_INDEPENDENT_CODE YES
+    )
+    target_compile_definitions(fe7_engine_startup_probe PRIVATE FE7_NATIVE_PORT=1)
+    target_compile_options(fe7_engine_startup_probe PRIVATE -Wall -Wextra)
+    target_include_directories(fe7_engine_startup_probe PRIVATE
+        "${FE7_SOURCE_ROOT}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    add_dependencies(fe7native fe7_engine_startup_probe)
+    message(STATUS "FE7 native source slice enabled: 11 linked data units plus AgbMain compile probe; game boot is not yet implemented.")
 else()
     message(STATUS "FE7_SOURCE_ROOT not set: building the current Android shell/runtime only.")
 endif()
