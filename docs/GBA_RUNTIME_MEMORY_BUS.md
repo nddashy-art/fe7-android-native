@@ -23,3 +23,8 @@ The native app's ROM picker remains user-supplied. This layer does not bundle RO
 The Android native library now has a C ABI replacement layer for commonly used BIOS entry points: `CpuSet`, `CpuFastSet`, `LZ77UnComp8bit`, `LZ77UnComp16bit`, `Div`, `DivRem`, `Sqrt`, `ArcTan2`, `BgAffineSet`, `ObjAffineSet`, `RegisterRamReset`, `SoftReset`, `VBlankIntrWait`, `SoundBiasReset` and `SoundBiasSet`. VBlank and reset callbacks let the Android host eventually schedule the game and re-enter initialization. In isolated host tests, VBlank defaults to a 16.7 ms wait if no host callback is registered.
 
 This remains a partial BIOS layer: Huffman/RL decoding, the full IRQ/timer/DMA model, register side effects, audio generation, and replacing all ARM7TDMI assembly sources are still open. The tests verify helper-level behavior only; they do not indicate the game boots.
+
+
+## Software DMA bridge (initial)
+
+Under `FE7_NATIVE_PORT`, the source adapter replaces the `DmaSet` register-write macro with `fe7_gba_dma_set`. That preserves the callsites (`DmaCopy16/32`, `DmaFill16/32`, etc.) while making immediate DMA perform a bounded software copy/fill through the virtual memory bus. The module also stores VBlank- and HBlank-triggered channel state and exposes `fe7_gba_dma_on_vblank` and `fe7_gba_dma_on_hblank` for the runtime/renderer. `VBlankIntrWait` invokes the VBlank DMA hook; HBlank DMA still requires the not-yet-integrated per-scanline renderer to call its hook. Audio/FIFO special DMA, channel-specific zero-count transfer lengths, DMA IRQ signaling, and exact I/O register readback remain unimplemented.
