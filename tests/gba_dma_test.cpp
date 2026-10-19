@@ -22,7 +22,7 @@ int main() {
     auto* vblank_dst = static_cast<std::uint16_t*>(fe7_gba_resolve_pointer(0x02002000u, 8, 1));
     assert(vblank_dst != nullptr);
     fe7_gba_dma_set(0, vblank_src.data(), reinterpret_cast<void*>(0x02002000u),
-                    (static_cast<std::uint32_t>(0x9260u) << 16) | 3u);
+                    (static_cast<std::uint32_t>(0x9360u) << 16) | 3u);
     assert(vblank_dst[0] == 0 && vblank_dst[1] == 0);
     fe7_gba_dma_on_vblank();
     for (std::size_t i = 0; i < 3; ++i) assert(vblank_dst[i] == vblank_src[i]);
