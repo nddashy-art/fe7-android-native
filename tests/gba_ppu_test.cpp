@@ -50,6 +50,8 @@ void TestRegularObjectOverTextBackground() {
 
     Write16(memory, kDisplayControl, (1u << 8) | (1u << 6) | (1u << 12));
     Write16(memory, kBg0Control, 31u << 8);
+    for (unsigned i = 0; i < 128; ++i)
+        Write16(memory, kOam + i * 8u, 0x0200u);  // Hide unused objects.
     Write16(memory, kPalette + 2u, 0x001Fu);             // BG red.
     Write16(memory, kPalette + 2u * (256u + 2u), 0x03E0u); // OBJ palette index 2 = green.
     Write16(memory, kVram + 31u * 0x800u, 0);
