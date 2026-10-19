@@ -1,6 +1,7 @@
 #include "fe7_engine_startup.h"
 #include "gba_header_parser.h"
 #include "gba_memory.h"
+#include "gba_ppu.h"
 #include "gba_port.h"
 
 #include <array>
