@@ -6,7 +6,7 @@ The target is a native Android port of the FE7 decompilation, not an emulator fr
 
 ## Verified repository state
 
-- app/src/main/cpp/CMakeLists.txt currently imports a prebuilt mGBA libretro core and links it into fe7native.
+- app/src/main/cpp/CMakeLists.txt imports the current mGBA libretro core and links it into fe7native. When Gradle receives `-Pfe7SourceRoot=/absolute/path/to/fe7_us-main`, it additionally compiles and bundles 11 authentic FE7 data-only C translation units. The existing play path still uses mGBA.
 - docs/DECOMPILATION_AUDIT.md says the supplied fe7_us-main archive targets ARM7TDMI and directly uses GBA MMIO, DMA, interrupts, BIOS assumptions, and ARM assembly.
 - docs/PORTING_PLAN.md correctly lists engine integration and title-screen boot as incomplete.
 - The decompilation archive itself is not present in the public repository tree inspected for this audit. The existing audit references a previously supplied archive, so the next implementation pass must work from that exact source snapshot and record its revision/checksum without committing ROM data or proprietary extracted assets.
@@ -40,11 +40,11 @@ Reference: https://github.com/nddashy-art/tmc/blob/master/docs/audio-pipeline-au
 - Categorize source files: portable game logic, GBA hardware/MMIO, BIOS, assembly, linker/startup, audio, graphics, input, saves.
 - Identify whether required generated game data/assets already exist in the source snapshot. Never put a commercial ROM or proprietary extracted assets in public Git or CI artifacts.
 
-### Milestone B — Portable build proof
-- Create a separate native target for portable FE7 modules; do not remove the current Android shell while the new path is experimental.
-- Compile one small, genuinely portable module and its tests with the Android NDK and a host compiler.
-- Add compatibility interfaces rather than scattering Android-specific conditionals through game logic.
-- Keep CI green without requiring a ROM.
+### Milestone B — Portable build proof (first source slice implemented)
+- An opt-in CMake object target now compiles 11 authentic data-only FE7 C translation units from a local source tree and bundles them into the Android native library.
+- `scripts/test_fe7_native_data_slice.py` host-compiles and links those same 11 source units without requiring a baserom.
+- The option is configured using `./gradlew assembleDebug -Pfe7SourceRoot=/absolute/path/to/fe7_us-main`; without the property, the existing Android shell build remains unchanged.
+- This is a first integration slice, not the gameplay engine or a title-screen boot.
 
 ### Milestone C — First vertical slice
 - Implement the minimum startup/runtime services required to call the decompiled initialization safely.
