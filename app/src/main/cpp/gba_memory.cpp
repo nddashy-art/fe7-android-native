@@ -15,6 +15,9 @@ std::uint32_t RotateRight32(std::uint32_t value, unsigned bits) {
 }
 }
 
+MemoryBus::MemoryBus() {
+    Reset(true);
+}
 bool MemoryBus::AttachRom(const std::uint8_t* data, std::size_t size) {
     if (data == nullptr || size == 0) return false;
     rom_ = data;
@@ -69,6 +72,11 @@ std::uint8_t* MemoryBus::ResolveWrite(std::uint32_t address, std::size_t length)
     return nullptr;
 }
 
+volatile void* MemoryBus::ResolveIoRegister(std::uint32_t address, std::size_t length) {
+    if (!RangeInside(address, length, kIoBase, kIoSize)) return nullptr;
+    return static_cast<volatile void*>(io_.data() + (address - kIoBase));
+}
+
 bool MemoryBus::Read8(std::uint32_t address, std::uint8_t* out) const {
     if (out == nullptr) return false;
     const auto* p = ResolveRead(address, 1);
@@ -97,7 +105,6 @@ bool MemoryBus::Read32(std::uint32_t address, std::uint32_t* out) const {
     *out = RotateRight32(aligned, rotate);
     return true;
 }
-
 bool MemoryBus::Write8(std::uint32_t address, std::uint8_t value) {
     if (address >= kOamBase && address < kOamBase + kOamSize) return true;
     if ((address >= kPaletteBase && address < kPaletteBase + kPaletteSize) ||
@@ -133,6 +140,9 @@ void MemoryBus::Reset(bool clear_ewram) {
     if (clear_ewram) ewram_.fill(0);
     iwram_.fill(0);
     io_.fill(0);
+    // KEYINPUT is active-low; 0x03FF means every key is released.
+    io_[0x130] = 0xFF;
+    io_[0x131] = 0x03;
     palette_.fill(0);
     vram_.fill(0);
     oam_.fill(0);
