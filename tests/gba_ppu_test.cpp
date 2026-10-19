@@ -111,6 +111,44 @@ void TestRegularObjectOverTextBackground() {
     assert(frame[Pixel(10, 20)] == 0xFFFF0000u);
 }
 
+void TestAffineObjectIdentityAndDoubleSize() {
+    fe7::gba::MemoryBus memory;
+    fe7::gba::PpuRenderer ppu(memory);
+
+    Write16(memory, kDisplayControl, (1u << 6) | (1u << 12)); // 1D OBJ tiles + OBJ enable.
+    Write16(memory, kPalette + 2u * (256u + 2u), 0x03E0u); // OBJ palette index 2 = green.
+    for (unsigned i = 0; i < 128; ++i)
+        Write16(memory, kOam + i * 8u, 0x0200u); // Hide every unused non-affine OBJ.
+    for (unsigned i = 0; i < 32; ++i)
+        assert(memory.Write8(kVram + 0x10000u + i, 0x22u)); // Tile 0, 4bpp index 2.
+
+    // Affine OBJ at (10,20), 8x8, using matrix 0. Matrix entries are the attr3
+    // halfwords of OAM entries 0, 1, 2, and 3.
+    Write16(memory, kOam, 20u | (1u << 8));
+    Write16(memory, kOam + 2u, 10u);
+    Write16(memory, kOam + 4u, 0u);
+    Write16(memory, kOam + 6u, 0x0100u);  // PA=1.0
+    Write16(memory, kOam + 14u, 0u);      // PB=0
+    Write16(memory, kOam + 22u, 0u);      // PC=0
+    Write16(memory, kOam + 30u, 0x0100u); // PD=1.0
+
+    std::array<std::uint32_t, fe7::gba::kPpuFramePixels> frame{};
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(10, 20)] == 0xFF00FF00u);
+    assert(frame[Pixel(17, 27)] == 0xFF00FF00u);
+    assert(frame[Pixel(18, 27)] == 0xFF000000u);
+
+    // Double-size bounds plus a 0.5 inverse matrix scale produce a 16x16 OBJ.
+    Write16(memory, kOam, 20u | (1u << 8) | (1u << 9));
+    Write16(memory, kOam + 6u, 0x0080u);
+    Write16(memory, kOam + 30u, 0x0080u);
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(10, 20)] == 0xFF00FF00u);
+    assert(frame[Pixel(25, 35)] == 0xFF00FF00u);
+    assert(frame[Pixel(26, 35)] == 0xFF000000u);
+    assert(frame[Pixel(9, 20)] == 0xFF000000u);
+}
+
 void TestRejectsShortOutputBuffer() {
     fe7::gba::MemoryBus memory;
     fe7::gba::PpuRenderer ppu(memory);
@@ -123,6 +161,7 @@ int main() {
     TestTextBackgroundAndForcedBlank();
     TestAffineBackgroundAndWraparound();
     TestRegularObjectOverTextBackground();
+    TestAffineObjectIdentityAndDoubleSize();
     TestRejectsShortOutputBuffer();
     std::cout << "GBA PPU tests passed\n";
     return 0;
