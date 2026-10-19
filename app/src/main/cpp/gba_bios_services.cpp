@@ -195,15 +195,17 @@ extern "C" void SoftReset(std::uint32_t flags) {
     // RAM reset has already occurred; a host callback is needed to re-enter AgbMain.
 }
 extern "C" void VBlankIntrWait(void) {
-    fe7_gba_dma_on_vblank();
     const auto callback = g_vblank_callback.load(std::memory_order_acquire);
     if (callback != nullptr) {
         callback();
     } else {
-        // Host-test fallback only; Android should install the real frame callback.
+        // Host-test fallback only; Android should install a frame callback.
         std::this_thread::sleep_for(std::chrono::microseconds(16667));
     }
+    fe7_gba_dma_on_vblank();
+    fe7_gba_irq_raise(1u); // VBlank interrupt flag
 }
+
 extern "C" void SoundBiasReset(void) {
     if (auto* bias = static_cast<volatile std::uint16_t*>(fe7_gba_io_pointer(0x04000088u, 2))) *bias = 0;
 }
