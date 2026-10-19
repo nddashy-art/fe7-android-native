@@ -77,6 +77,13 @@ extern "C" int fe7_gba_attach_rom(const uint8_t* data, size_t size) {
 }
 extern "C" void fe7_gba_detach_rom(void) { g_memory.DetachRom(); }
 extern "C" void fe7_gba_reset(int clear_ewram) { g_memory.Reset(clear_ewram != 0); }
+extern "C" void fe7_gba_set_keys(std::uint16_t pressed_keys) {
+    constexpr std::uint16_t kGbaKeyMask = 0x03FFu;
+    auto* keyinput = static_cast<volatile std::uint16_t*>(
+        g_memory.ResolveIoRegister(0x04000130u, sizeof(std::uint16_t)));
+    if (keyinput == nullptr) return;
+    *keyinput = static_cast<std::uint16_t>((~pressed_keys) & kGbaKeyMask);
+}
 extern "C" int fe7_gba_render_frame(uint32_t* output_argb, size_t pixel_count) {
     return g_ppu.RenderFrame(output_argb, pixel_count) ? 1 : 0;
 }
