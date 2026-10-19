@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "gba_header_parser.h"
+#include "gba_port.h"
 #include "third_party/libretro.h"
 
 namespace {
@@ -281,6 +282,21 @@ Java_org_fe7android_nativeport_MainActivity_nativeRunFrameInto(
 extern "C" JNIEXPORT void JNICALL
 Java_org_fe7android_nativeport_MainActivity_nativeSetButtons(JNIEnv*, jobject, jint buttons) {
     g_buttons = static_cast<unsigned>(buttons);
+
+    // Libretro uses a different button order than GBA KEYINPUT. Preserve
+    // g_buttons for mGBA and mirror the same physical presses to the native bus.
+    std::uint16_t gba_pressed = 0;
+    if (g_buttons & (1u << 8))  gba_pressed |= 1u << 0; // A
+    if (g_buttons & (1u << 0))  gba_pressed |= 1u << 1; // B
+    if (g_buttons & (1u << 2))  gba_pressed |= 1u << 2; // Select
+    if (g_buttons & (1u << 3))  gba_pressed |= 1u << 3; // Start
+    if (g_buttons & (1u << 7))  gba_pressed |= 1u << 4; // Right
+    if (g_buttons & (1u << 6))  gba_pressed |= 1u << 5; // Left
+    if (g_buttons & (1u << 4))  gba_pressed |= 1u << 6; // Up
+    if (g_buttons & (1u << 5))  gba_pressed |= 1u << 7; // Down
+    if (g_buttons & (1u << 11)) gba_pressed |= 1u << 8; // R
+    if (g_buttons & (1u << 10)) gba_pressed |= 1u << 9; // L
+    fe7_gba_set_keys(gba_pressed);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -291,33 +307,61 @@ Java_org_fe7android_nativeport_MainActivity_nativeStopGame(JNIEnv*, jobject) {
 /** Keep the standalone JNI/video-path diagnostic available beside the real core. */
 extern "C" JNIEXPORT jintArray JNICALL
 Java_org_fe7android_nativeport_MainActivity_nativeCreateTestFrame(JNIEnv* env, jobject) {
-    constexpr int width = 240;
-    constexpr int height = 160;
-    std::vector<jint> pixels(static_cast<std::size_t>(width * height));
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            std::uint32_t color = 0xFF000000u;
-            if (y < 105) {
-                color |= (static_cast<std::uint32_t>(45 + y / 3) << 16) |
-                         (static_cast<std::uint32_t>(105 + y / 5) << 8) |
-                         static_cast<std::uint32_t>(165 + y / 8);
-            } else if (y < 145) {
-                color |= 0xFF3C844Bu;
-            } else {
-                static const std::uint32_t palette[] = {
-                    0xFFDC504Eu, 0xFFF09D49u, 0xFFF5DA62u, 0xFF64BE6Eu,
-                    0xFF4AA6C2u, 0xFF6473DCu, 0xFFA667CCu, 0xFFEDEDE4u,
-                    0xFF373F4Eu, 0xFF121720u
-                };
-                color = palette[std::min((x - (x % 22)) / 22, 9)];
-            }
-            if (x < 2 || x >= width - 2 || y < 2 || y >= height - 2) color = 0xFFFFD98Au;
-            pixels[static_cast<std::size_t>(y * width + x)] = static_cast<jint>(color);
+    // Exercise the real software GBA PPU against synthetic VRAM/palette/OAM data.
+    // This diagnostic does not load or pretend to boot an FE7 ROM.
+    fe7_gba_reset(1);
+
+    auto* display_control = static_cast<volatile std::uint16_t*>(
+        fe7_gba_io_pointer(0x04000000u, sizeof(std::uint16_t)));
+    auto* bg0_control = static_cast<volatile std::uint16_t*>(
+        fe7_gba_io_pointer(0x04000008u, sizeof(std::uint16_t)));
+    auto* palette = static_cast<std::uint16_t*>(
+        fe7_gba_resolve_pointer(0x05000000u, 0x400u, 1));
+    auto* vram = static_cast<std::uint8_t*>(
+        fe7_gba_resolve_pointer(0x06000000u, 0x18000u, 1));
+    auto* oam = static_cast<std::uint16_t*>(
+        fe7_gba_resolve_pointer(0x07000000u, 0x400u, 1));
+    if (display_control == nullptr || bg0_control == nullptr ||
+        palette == nullptr || vram == nullptr || oam == nullptr) {
+        return env->NewIntArray(0);
+    }
+
+    *display_control = static_cast<std::uint16_t>((1u << 8) | (1u << 6) | (1u << 12));
+    *bg0_control = static_cast<std::uint16_t>(31u << 8);  // BG0 screen base block 31.
+
+    palette[1] = 0x001Fu;       // BG palette 1: red.
+    palette[2] = 0x7C00u;       // BG palette 2: blue.
+    palette[256u + 3u] = 0x03E0u;  // OBJ palette 3: green.
+
+    // Two synthetic 4bpp character tiles, addressed in 32-byte units.
+    std::fill(vram, vram + 32, 0x11u);
+    std::fill(vram + 32, vram + 64, 0x22u);
+    // OBJ tile memory starts at VRAM + 0x10000.
+    std::fill(vram + 0x10000u, vram + 0x10000u + 32u, 0x33u);
+
+    // Checker pattern across the 32x32 text map in screen block 31.
+    auto* tile_map = reinterpret_cast<std::uint16_t*>(vram + 31u * 0x800u);
+    for (unsigned y = 0; y < 32; ++y) {
+        for (unsigned x = 0; x < 32; ++x) {
+            tile_map[y * 32u + x] = static_cast<std::uint16_t>(((x / 4u + y / 4u) & 1u) ? 1u : 0u);
         }
+    }
+
+    // Hide unused objects; draw one 8x8 green sprite at (90, 64).
+    std::fill(oam, oam + 128u * 4u, 0u);
+    for (unsigned i = 0; i < 128; ++i) oam[i * 4u] = 0x0200u;
+    oam[0] = 64u;   // Attribute 0: Y, regular square OBJ.
+    oam[1] = 90u;   // Attribute 1: X, 8x8 size.
+    oam[2] = 0u;    // Attribute 2: tile 0, priority 0, palette bank 0.
+
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kFrameWidth) * kFrameHeight);
+    if (!fe7_gba_render_frame(pixels.data(), pixels.size())) {
+        return env->NewIntArray(0);
     }
     jintArray result = env->NewIntArray(static_cast<jsize>(pixels.size()));
     if (result == nullptr) return nullptr;
-    env->SetIntArrayRegion(result, 0, static_cast<jsize>(pixels.size()), pixels.data());
+    env->SetIntArrayRegion(result, 0, static_cast<jsize>(pixels.size()),
+                           reinterpret_cast<const jint*>(pixels.data()));
     return result;
 }
 

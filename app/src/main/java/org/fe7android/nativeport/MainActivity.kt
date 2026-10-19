@@ -435,7 +435,7 @@ class MainActivity : Activity() {
                         pixels, TEST_FRAME_WIDTH, TEST_FRAME_HEIGHT, Bitmap.Config.ARGB_8888
                     )
                 )
-                status.text = "Fotograma recibido desde C++ y dibujado en Android.\nEsto valida el transporte de imagen; no es el juego."
+                status.text = "Fotograma renderizado por el PPU software GBA: fondo con tiles y sprite de prueba.\nDatos sintéticos; esto verifica el renderizador, no el arranque del juego."
             } else {
                 status.text = "La prueba devolvió un tamaño inesperado (${pixels.size})."
             }

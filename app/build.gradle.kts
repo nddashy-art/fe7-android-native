@@ -3,6 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val fe7SourceRoot = providers.gradleProperty("fe7SourceRoot").orNull
+    ?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "org.fe7android.nativeport"
     compileSdk = 35
@@ -15,6 +18,13 @@ android {
         versionCode = 1
         versionName = "0.2.0-mgba-preview"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        if (fe7SourceRoot != null) {
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf("-DFE7_SOURCE_ROOT=${file(fe7SourceRoot).absolutePath}")
+                }
+            }
+        }
     }
 
     externalNativeBuild {
