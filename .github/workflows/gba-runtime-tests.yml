@@ -18,3 +18,5 @@ jobs:
         run: c++ --version
       - name: Run portable GBA runtime tests
         run: sh scripts/test_gba_bios_compat.sh
+      - name: Test FE7 source compatibility patcher
+        run: python3 tests/test_prepare_fe7_native_source.py
