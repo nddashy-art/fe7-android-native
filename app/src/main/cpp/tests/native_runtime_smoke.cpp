@@ -38,6 +38,10 @@ int main() {
     // it validates the header and attaches ROM memory, but does not run AgbMain.
     assert(fe7_engine_prepare(rom.data(), rom.size()) == FE7_ENGINE_BOOT_RUNTIME_PREPARED);
     assert(fe7_engine_boot_state() == FE7_ENGINE_BOOT_RUNTIME_PREPARED);
+    const auto* mapped_rom = static_cast<const std::uint8_t*>(
+        fe7_gba_resolve_pointer(0x08000000u, 4, 0));
+    assert(mapped_rom == rom.data());
+    assert(mapped_rom[0xA0] == 'F');
     assert(fe7_gba_render_frame(nullptr, 0) == 0);
 
     // Exercise the software PPU with synthetic VRAM/palette data. This
@@ -78,6 +82,7 @@ int main() {
 
     fe7_engine_shutdown();
     assert(fe7_engine_boot_state() == FE7_ENGINE_BOOT_NO_ROM);
+    assert(fe7_gba_resolve_pointer(0x08000000u, 4, 0) == nullptr);
 
     std::vector<std::uint8_t> invalid_rom(0xC0, 0);
     std::memcpy(invalid_rom.data() + 0xA0, "NOT A GAME", 10);
