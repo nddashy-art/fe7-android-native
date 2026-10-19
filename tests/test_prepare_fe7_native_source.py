@@ -46,9 +46,9 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             )
             (source / "interrupt.c").write_text(original_interrupt, encoding="utf-8")
             original_main = (
-                'void AgbMain(void)\\n{\\n    InitGame();\\n    for (;;)\\n'
-                '    {\\n        RunMainFunc();\\n        SoftResetIfKeyCombo();\\n'
-                '    }\\n}\\n\\nvoid PutBuildInfo(u16 * tm)\\n{\\n}\\n'
+                'void AgbMain(void)\n{\n    InitGame();\n    for (;;)\n'
+                '    {\n        RunMainFunc();\n        SoftResetIfKeyCombo();\n'
+                '    }\n}\n\nvoid PutBuildInfo(u16 * tm)\n{\n}\n'
             )
             (source / "main.c").write_text(original_main, encoding="utf-8")
             original_gbaio = (include / "gbaio.h").read_bytes()
