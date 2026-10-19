@@ -13,9 +13,9 @@ constexpr unsigned kPpuFrameHeight = 160;
 constexpr std::size_t kPpuFramePixels =
     static_cast<std::size_t>(kPpuFrameWidth) * kPpuFrameHeight;
 
-// Software PPU baseline for GBA text backgrounds and regular (non-affine)
-// objects. Bitmap/affine modes, windows, mosaic and color effects are not yet
-// implemented. The class reads from the same bus written by FE7's C runtime.
+// Software PPU for text backgrounds, affine BG2/BG3 (modes 1/2), and
+// regular non-affine objects. Bitmap modes, affine objects, windows, mosaic,
+// blending, and cycle-accurate scanline effects remain unimplemented.
 class PpuRenderer final {
 public:
     explicit PpuRenderer(const MemoryBus& memory) : memory_(memory) {}
