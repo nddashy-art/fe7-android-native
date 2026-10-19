@@ -32,11 +32,10 @@ private:
                                    std::uint32_t* color,
                                    std::uint16_t* rank) const;
     void RenderObjects();
+    void RenderObject(unsigned oam_index);
     bool ReadTextTilePixel(unsigned bg, std::uint16_t control,
                            unsigned screen_x, unsigned screen_y,
                            std::uint8_t* palette_index) const;
-    bool ReadObjectPixel(unsigned x, unsigned y, unsigned* priority,
-                         unsigned* oam_index, std::uint32_t* color) const;
     std::uint32_t ReadPaletteColor(unsigned palette_index) const;
     static std::uint32_t ConvertBgr555(std::uint16_t color);
 
