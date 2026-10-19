@@ -36,6 +36,7 @@ private:
                                      std::uint16_t* rank) const;
     void RenderObjects();
     void RenderObject(unsigned oam_index);
+    void RenderAffineObject(unsigned oam_index);
     bool ReadTextTilePixel(unsigned bg, std::uint16_t control,
                            unsigned screen_x, unsigned screen_y,
                            std::uint8_t* palette_index) const;
