@@ -1,5 +1,6 @@
 #include "gba_port.h"
 #include "gba_memory.h"
+#include "gba_ppu.h"
 
 #include <array>
 #include <cassert>
@@ -8,6 +9,15 @@
 
 int main() {
     fe7_gba_reset(1);
+    // The public runtime bridge exposes the software PPU to a future native frame loop.
+    auto* display_control = static_cast<volatile std::uint16_t*>(
+        fe7_gba_io_pointer(0x04000000u, 2));
+    assert(display_control != nullptr);
+    *display_control = 1u << 7;  // Forced blank must render white.
+    std::array<std::uint32_t, fe7::gba::kPpuFramePixels> rendered{};
+    assert(fe7_gba_render_frame(rendered.data(), rendered.size()) == 1);
+    assert(rendered.front() == 0xFFFFFFFFu && rendered.back() == 0xFFFFFFFFu);
+
     auto* io = static_cast<volatile std::uint16_t*>(fe7_gba_io_pointer(0x04000130u, 2));
     assert(io != nullptr && *io == 0x03FFu);
     *io = 0x02FFu;
