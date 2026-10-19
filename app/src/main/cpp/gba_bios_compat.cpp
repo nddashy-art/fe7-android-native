@@ -5,49 +5,51 @@
 
 namespace fe7::bios {
 namespace {
-bool ValidBuffers(const void* destination, const void* source, std::size_t bytes) {
-    return bytes == 0 || (destination != nullptr && source != nullptr);
+bool HasBuffers(const void* source, void* destination, std::size_t bytes) {
+    return bytes == 0 || (source != nullptr && destination != nullptr);
+}
+bool CheckedBytes(std::size_t count, std::size_t unit, std::size_t* bytes) {
+    if (unit != 0 && count > std::numeric_limits<std::size_t>::max() / unit) return false;
+    *bytes = count * unit;
+    return true;
 }
 }
 
-bool CpuSet(void* destination, const void* source, std::uint32_t control) {
-    const std::size_t count = control & kCpuSetCountMask;
-    const std::size_t unit = (control & kCpuSetWord) ? sizeof(std::uint32_t) : sizeof(std::uint16_t);
-    if (count > std::numeric_limits<std::size_t>::max() / unit) return false;
-    const std::size_t bytes = count * unit;
-    if (!ValidBuffers(destination, source, bytes)) return false;
+bool CpuSet(const void* source, void* destination, std::uint32_t control) {
+    const std::size_t count = control & kTransferCountMask;
+    const std::size_t unit = (control & kTransfer32Bit) ? sizeof(std::uint32_t) : sizeof(std::uint16_t);
+    std::size_t bytes = 0;
+    if (!CheckedBytes(count, unit, &bytes) || !HasBuffers(source, destination, bytes)) return false;
+    if (bytes == 0) return true;
 
     auto* dst = static_cast<std::uint8_t*>(destination);
     const auto* src = static_cast<const std::uint8_t*>(source);
-    if (control & kCpuSetFill) {
-        // BIOS fill repeats the first halfword/word from source.
-        if (bytes == 0) return true;
-        if (src == nullptr) return false;
+    if (control & kSourceFixed) {
         for (std::size_t offset = 0; offset < bytes; offset += unit)
             std::memcpy(dst + offset, src, unit);
-    } else if (bytes != 0) {
+    } else {
         std::memmove(dst, src, bytes);
     }
     return true;
 }
 
-bool CpuFastSet(void* destination, const void* source, std::uint32_t control) {
-    // CpuFastSet transfers words in groups of eight. The count is rounded up
-    // to a multiple of eight words by the BIOS contract.
-    const std::size_t words = control & kCpuSetCountMask;
-    if (words > std::numeric_limits<std::size_t>::max() - 7) return false;
+bool CpuFastSet(const void* source, void* destination, std::uint32_t control) {
+    // CpuFastSet transfers 32-bit words in groups of eight; the word count is
+    // rounded up to the next multiple of eight as on the GBA BIOS.
+    const std::size_t words = control & kTransferCountMask;
+    if (words > std::numeric_limits<std::size_t>::max() - 7u) return false;
     const std::size_t rounded_words = (words + 7u) & ~std::size_t(7u);
-    if (rounded_words > std::numeric_limits<std::size_t>::max() / sizeof(std::uint32_t)) return false;
-    const std::size_t bytes = rounded_words * sizeof(std::uint32_t);
-    if (!ValidBuffers(destination, source, bytes)) return false;
+    std::size_t bytes = 0;
+    if (!CheckedBytes(rounded_words, sizeof(std::uint32_t), &bytes) ||
+        !HasBuffers(source, destination, bytes)) return false;
+    if (bytes == 0) return true;
 
     auto* dst = static_cast<std::uint8_t*>(destination);
     const auto* src = static_cast<const std::uint8_t*>(source);
-    if (control & kCpuSetFill) {
-        if (bytes == 0) return true;
+    if (control & kSourceFixed) {
         for (std::size_t offset = 0; offset < bytes; offset += sizeof(std::uint32_t))
             std::memcpy(dst + offset, src, sizeof(std::uint32_t));
-    } else if (bytes != 0) {
+    } else {
         std::memmove(dst, src, bytes);
     }
     return true;
@@ -78,9 +80,9 @@ bool Lz77UnCompWram(const std::uint8_t* input, std::size_t input_size,
             if (in + 1 >= input_size) return false;
             const std::uint8_t a = input[in++];
             const std::uint8_t b = input[in++];
-            const std::size_t length = static_cast<std::size_t>((a >> 4) + 3);
+            const std::size_t length = static_cast<std::size_t>(a >> 4) + 3;
             const std::size_t displacement =
-                (static_cast<std::size_t>(a & 0x0Fu) << 8 | b) + 1;
+                ((static_cast<std::size_t>(a & 0x0Fu) << 8) | b) + 1;
             if (displacement > out || length > decoded_size - out) return false;
             for (std::size_t i = 0; i < length; ++i) {
                 output[out] = output[out - displacement];
