@@ -13,9 +13,9 @@ constexpr unsigned kPpuFrameHeight = 160;
 constexpr std::size_t kPpuFramePixels =
     static_cast<std::size_t>(kPpuFrameWidth) * kPpuFrameHeight;
 
-// Software PPU for text backgrounds, affine BG2/BG3 (modes 1/2), and
-// regular non-affine objects. Bitmap modes, affine objects, windows, mosaic,
-// blending, and cycle-accurate scanline effects remain unimplemented.
+// Software PPU for text backgrounds, affine BG2/BG3 (modes 1/2), regular
+// non-affine objects, and affine OBJ transforms. Bitmap modes, windows,
+// mosaic, blending, and cycle-accurate scanline effects remain unimplemented.
 class PpuRenderer final {
 public:
     explicit PpuRenderer(const MemoryBus& memory) : memory_(memory) {}
