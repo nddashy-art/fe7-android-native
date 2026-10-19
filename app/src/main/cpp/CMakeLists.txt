@@ -48,7 +48,7 @@ if(FE7_SOURCE_ROOT)
     )
     foreach(FE7_SOURCE IN LISTS FE7_NATIVE_SEED_SOURCES)
         if(NOT EXISTS "${FE7_SOURCE}")
-            message(FATAL_ERROR "Required FE7 data-slice source is missing: ${FE7_SOURCE}")
+            message(FATAL_ERROR "Required FE7 source-slice module is missing: ${FE7_SOURCE}")
         endif()
     endforeach()
 
