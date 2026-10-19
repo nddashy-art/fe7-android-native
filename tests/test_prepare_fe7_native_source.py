@@ -18,7 +18,8 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             (include / "gbaio.h").write_text(
                 '#ifndef GBAIO_H\n#define GBAIO_H\n#include "prelude.h"\n\n'
                 '#define REG(type, addr) (*((type volatile *)(addr)))\n'
-                '#define INTR_VECTOR (*(void **)0x03007FFC)\n#endif\n', encoding="utf-8")
+                '#define INTR_VECTOR (*(void **)0x03007FFC)\n'
+                '#define DmaSet(dma_num, src, dst, control) ((void)0)\n#endif\n', encoding="utf-8")
             (include / "gbavideo.h").write_text(
                 '#ifndef GBAVIDEO_H\n#define GBAVIDEO_H\n#include "prelude.h"\n\n'
                 '#define VRAM_ADDR 0x06000000\n#define VRAM_SIZE 0x18000\n'
