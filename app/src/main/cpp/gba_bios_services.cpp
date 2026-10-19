@@ -195,6 +195,7 @@ extern "C" void SoftReset(std::uint32_t flags) {
     // RAM reset has already occurred; a host callback is needed to re-enter AgbMain.
 }
 extern "C" void VBlankIntrWait(void) {
+    fe7_gba_dma_on_vblank();
     const auto callback = g_vblank_callback.load(std::memory_order_acquire);
     if (callback != nullptr) {
         callback();
