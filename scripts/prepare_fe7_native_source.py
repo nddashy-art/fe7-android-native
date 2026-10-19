@@ -51,6 +51,63 @@ def wrap_dma_macro(path: Path) -> bool:
     raise RuntimeError(f"could not locate DmaSet macro in {path}")
 
 
+def wrap_interrupt_source(path: Path) -> bool:
+    """Replace ARM7TDMI IntrMain assembly assumptions with a C IRQ dispatch path."""
+    source = path.read_text(encoding="utf-8")
+    if "fe7_gba_dispatch_pending_irqs" in source:
+        return False
+    marker = "extern void IntrMain(void);"
+    if marker not in source:
+        raise RuntimeError(f"could not locate IntrMain declaration in {path}")
+    native = """#ifdef FE7_NATIVE_PORT
+#include "gba_port.h"
+
+void (*IntrFuncTable[14])(void);
+u32 IntrMainRam[0x200];
+void DummyIntFunc(void);
+
+void IntrMain(void)
+{
+    fe7_gba_dispatch_pending_irqs();
+}
+
+void DummyIntFunc(void)
+{
+}
+
+void IrqInit(void)
+{
+    int i;
+    for (i = 0; i < 14; ++i)
+    {
+        IntrFuncTable[i] = DummyIntFunc;
+        fe7_gba_set_irq_handler((unsigned)i, DummyIntFunc);
+    }
+    REG_IME = 0;
+    REG_IE = 0;
+    fe7_gba_irq_clear(0x3FFF);
+    INTR_VECTOR = IntrMainRam;
+}
+
+void SetIrqFunc(int num, void (*func)(void))
+{
+    if (num < 0 || num >= 14)
+        return;
+    if (func == NULL)
+        func = DummyIntFunc;
+    IntrFuncTable[num] = func;
+    fe7_gba_set_irq_handler((unsigned)num, func);
+}
+#else
+"""
+    updated = source.replace(marker, native + marker, 1) + "\n#endif // FE7_NATIVE_PORT\n"
+    backup = path.with_name(path.name + ".fe7native.bak")
+    if not backup.exists():
+        shutil.copy2(path, backup)
+    path.write_text(updated, encoding="utf-8")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source_root", type=Path, help="extracted FE7 decompilation root")
@@ -170,6 +227,7 @@ u32 (*COMMON(VerifySramFast) VerifySramFast)(void const * src, void * dst, u32 s
 #endif
 }""")
     changed += wrap_dma_macro(inc / "gbaio.h")
+    changed += wrap_interrupt_source(root / "src" / "interrupt.c")
     print(f"Native memory-header adapter applied to {root} ({changed} edits).")
     print("Backups use the .fe7native.bak suffix. This is not a game-engine build or ROM boot test.")
     print("Compile with FE7_NATIVE_PORT defined and include app/src/main/cpp for the native API.")
