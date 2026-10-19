@@ -44,34 +44,28 @@ extern "C" void fe7_gba_advance_frame(void) {
     const std::uint16_t configuration =
         static_cast<std::uint16_t>(*dispstat & ~kStatusMask);
 
+    const auto compare = static_cast<unsigned>((configuration & kVCountCompareMask) >> 8);
     for (unsigned line = 0; line < kTotalScanlines; ++line) {
         SetLineState(dispstat, vcount, configuration, line);
 
-        if (line < kVisibleScanlines) {
-            *dispstat = static_cast<std::uint16_t>(configuration |
-                (line == 0 ? 0 : 0) |
-                (((configuration & kVCountCompareMask) >> 8) == line ? kVCountFlag : 0));
-            *dispstat = static_cast<std::uint16_t>(*dispstat | kHBlankFlag);
-            fe7_gba_dma_on_hblank(line);
-            if ((configuration & kHBlankIrqEnable) != 0)
-                fe7_gba_irq_raise(1u << 1);
-            *dispstat = static_cast<std::uint16_t>(*dispstat & ~kHBlankFlag);
-        } else {
-            *dispstat = static_cast<std::uint16_t>(*dispstat | kHBlankFlag);
-            if ((configuration & kHBlankIrqEnable) != 0)
-                fe7_gba_irq_raise(1u << 1);
-            *dispstat = static_cast<std::uint16_t>(*dispstat & ~kHBlankFlag);
-        }
-
-        const auto compare = static_cast<unsigned>((configuration & kVCountCompareMask) >> 8);
+        // VCOUNT compare and VBlank occur at the start of their respective lines.
         if (line == compare && (configuration & kVCountIrqEnable) != 0)
             fe7_gba_irq_raise(1u << 2);
-
         if (line == kVisibleScanlines) {
             fe7_gba_dma_on_vblank();
             if ((configuration & kVBlankIrqEnable) != 0)
                 fe7_gba_irq_raise(1u << 0);
         }
+
+        const std::uint16_t line_state = static_cast<std::uint16_t>(
+            configuration | (line >= kVisibleScanlines ? kVBlankFlag : 0) |
+            (line == compare ? kVCountFlag : 0));
+        *dispstat = static_cast<std::uint16_t>(line_state | kHBlankFlag);
+        if (line < kVisibleScanlines)
+            fe7_gba_dma_on_hblank(line);
+        if ((configuration & kHBlankIrqEnable) != 0)
+            fe7_gba_irq_raise(1u << 1);
+        *dispstat = line_state;
     }
 
     // Return to the beginning-of-frame state. VCOUNT=0's compare event is
