@@ -24,12 +24,14 @@ COMMON="-std=c++17 -Wall -Wextra -Werror"
   "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
   "$ROOT/app/src/main/cpp/gba_memory.cpp" \
   "$ROOT/app/src/main/cpp/gba_port.cpp" \
+  "$ROOT/app/src/main/cpp/gba_ppu.cpp" \
   "$ROOT/tests/gba_port_test.cpp" -o "$PORT_BIN"
 "$PORT_BIN"
 "$CXX" $COMMON -I"$ROOT/app/src/main/cpp" \
   "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
   "$ROOT/app/src/main/cpp/gba_memory.cpp" \
   "$ROOT/app/src/main/cpp/gba_port.cpp" \
+  "$ROOT/app/src/main/cpp/gba_ppu.cpp" \
   "$ROOT/app/src/main/cpp/gba_bios_services.cpp" \
   "$ROOT/app/src/main/cpp/gba_dma.cpp" \
   "$ROOT/app/src/main/cpp/gba_irq.cpp" \
@@ -39,6 +41,7 @@ COMMON="-std=c++17 -Wall -Wextra -Werror"
   "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
   "$ROOT/app/src/main/cpp/gba_memory.cpp" \
   "$ROOT/app/src/main/cpp/gba_port.cpp" \
+  "$ROOT/app/src/main/cpp/gba_ppu.cpp" \
   "$ROOT/app/src/main/cpp/gba_dma.cpp" \
   "$ROOT/tests/gba_dma_test.cpp" -o "$DMA_BIN"
 "$DMA_BIN"
@@ -46,6 +49,7 @@ COMMON="-std=c++17 -Wall -Wextra -Werror"
   "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
   "$ROOT/app/src/main/cpp/gba_memory.cpp" \
   "$ROOT/app/src/main/cpp/gba_port.cpp" \
+  "$ROOT/app/src/main/cpp/gba_ppu.cpp" \
   "$ROOT/app/src/main/cpp/gba_irq.cpp" \
   "$ROOT/tests/gba_irq_test.cpp" -o "$IRQ_BIN"
 "$IRQ_BIN"
@@ -53,6 +57,7 @@ COMMON="-std=c++17 -Wall -Wextra -Werror"
   "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
   "$ROOT/app/src/main/cpp/gba_memory.cpp" \
   "$ROOT/app/src/main/cpp/gba_port.cpp" \
+  "$ROOT/app/src/main/cpp/gba_ppu.cpp" \
   "$ROOT/app/src/main/cpp/fe7_engine_startup.cpp" \
   "$ROOT/tests/fe7_engine_startup_test.cpp" -o "$STARTUP_BIN"
 "$STARTUP_BIN"
