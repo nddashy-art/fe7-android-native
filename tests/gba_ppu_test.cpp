@@ -44,6 +44,44 @@ void TestTextBackgroundAndForcedBlank() {
     assert(frame.back() == 0xFFFFFFFFu);
 }
 
+void TestAffineBackgroundAndWraparound() {
+    fe7::gba::MemoryBus memory;
+    fe7::gba::PpuRenderer ppu(memory);
+
+    // Mode 1: BG2 is affine; a 256x256 tile map is sufficient for this frame.
+    Write16(memory, kDisplayControl, 1u | (1u << 10));
+    Write16(memory, kBgControl + 4u, (31u << 8) | (1u << 14));
+    Write16(memory, kPalette + 2u, 0x001Fu); // Palette index 1 = red.
+    for (unsigned i = 0; i < 32u * 32u; ++i)
+        assert(memory.Write8(kVram + 31u * 0x800u + i, 1u));
+    for (unsigned i = 0; i < 64u; ++i)
+        assert(memory.Write8(kVram + 64u + i, 1u)); // Affine tile 1, 8bpp.
+    Write16(memory, 0x04000020u, 0x0100u); // PA=1.0
+    Write16(memory, 0x04000022u, 0x0000u); // PB=0
+    Write16(memory, 0x04000024u, 0x0000u); // PC=0
+    Write16(memory, 0x04000026u, 0x0100u); // PD=1.0
+    assert(memory.Write32(0x04000028u, 0u));
+    assert(memory.Write32(0x0400002Cu, 0u));
+
+    std::array<std::uint32_t, fe7::gba::kPpuFramePixels> frame{};
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(0, 0)] == 0xFFFF0000u);
+    assert(frame[Pixel(239, 159)] == 0xFFFF0000u);
+
+    // Reference X=256 pixels lies outside an unwrapped 256px BG.
+    assert(memory.Write32(0x04000028u, 0x00010000u));
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(0, 0)] == 0xFF000000u);
+
+    // With the hardware wrap flag, the same coordinate wraps to X=0.
+    auto* bg2_control = static_cast<volatile std::uint16_t*>(
+        memory.ResolveIoRegister(kBgControl + 4u, 2u));
+    assert(bg2_control != nullptr);
+    *bg2_control = static_cast<std::uint16_t>(*bg2_control | (1u << 13));
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(0, 0)] == 0xFFFF0000u);
+}
+
 void TestRegularObjectOverTextBackground() {
     fe7::gba::MemoryBus memory;
     fe7::gba::PpuRenderer ppu(memory);
@@ -83,6 +121,7 @@ void TestRejectsShortOutputBuffer() {
 
 int main() {
     TestTextBackgroundAndForcedBlank();
+    TestAffineBackgroundAndWraparound();
     TestRegularObjectOverTextBackground();
     TestRejectsShortOutputBuffer();
     std::cout << "GBA PPU tests passed\n";
