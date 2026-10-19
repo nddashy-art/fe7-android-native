@@ -7,6 +7,7 @@ The supplied FE7 US decompilation archive has been inventoried and its checksum 
 - Software GBA memory bus plus initial BIOS-compatible helpers, DMA and IRQ services, with host tests.
 - Source adapter script that conditionally maps GBA memory/registers, DMA, interrupts, SRAM fast routines and the `AgbMain` loop to the host bridge. The script is regression-tested but does not mean every adapted engine file compiles.
 - Optional `FE7_SOURCE_ROOT` CMake/Gradle wiring for the local FE7 decompilation.
+- Android JNI now attaches the exact ROM buffer used by the mGBA frontend to the experimental native GBA memory bus for preparation/diagnostics, and detaches it before releasing the buffer. Host tests assert the mapping and shutdown behavior.
 - First authentic source slice: 13 low-dependency FE7 C translation units compile/link into the native library with the local source root enabled. Five additional service/game translation units (`async_upload.c`, `audio.c`, `event.c`, `gbasram.c`, `interrupt.c`) and `main.c` compile as isolated objects.
 - The C sound driver `m4a.c` also compiles to an isolated object for `armeabi-v7a` (but is not linked/executed). Eight original ARM assembly units compile as objects for the `armeabi-v7a` ABI only; these assembly objects are not yet linked or executed.
 
@@ -45,3 +46,8 @@ The archive's public headers declare `StartGame` and multiple unknown startup ro
 ## Android CI source-root verification (2026-10-19)
 
 The Android debug workflow now checks out the upstream FE7 US source at pinned commit `5c8b3c5e254e00f0f3458b9772c27e1a5a326e3b`, runs the compatibility adapter, and builds with `FE7_SOURCE_ROOT` enabled. This compiles and links the selected C source slice into the shared library and compiles the isolated startup/service/ARMv7 probes on CI. The workflow succeeded on run `39239326207` and uploaded a debug APK artifact. This is materially stronger source-build coverage, but the app's gameplay route still calls mGBA; CI still does not prove `AgbMain` or `StartGame` can run natively.
+
+
+## Native ROM-buffer lifecycle integration (2026-10-19)
+
+The Android game-start JNI now validates and attaches the selected FE7 ROM to the native software GBA bus, while mGBA continues to execute the game. The runtime borrows the frontend's ROM vector without copying it and detaches before that vector is cleared. Host tests verify pointer identity and that ROM reads are no longer mapped after shutdown. This is an integration milestone only; no FE7 CPU or `AgbMain` execution is implied.
