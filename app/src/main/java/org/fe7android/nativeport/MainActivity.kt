@@ -100,7 +100,7 @@ class MainActivity : Activity() {
         }
 
         val warning = TextView(this).apply {
-            text = "${nativeGetBridgeStatus()}\n\nPrototipo: el motor del juego aún no está integrado y la ROM todavía no se puede ejecutar."
+            text = "${nativeGetBridgeStatus()}\n\nMotor mGBA integrado en esta versión experimental. Si no arranca, revisa el mensaje al iniciar."
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(0xFFFFD98A.toInt())
