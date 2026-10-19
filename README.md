@@ -2,7 +2,7 @@
 
 An experimental effort to bring a **user-supplied, legally obtained Fire Emblem: The Blazing Blade (US)** build to Android, with touch controls, controller support, and eventually optional local-network multiplayer and mod support.
 
-> **Current status: launcher and native-diagnostics prototype only.** The app selects and remembers a user-supplied `.gba` file and passes its header bytes to a small C++/JNI library. The original FE7 engine is not integrated, so the ROM is not executed and this is not a playable port.
+> **Current status: launcher and native-diagnostics prototype only.** The app selects and remembers a user-supplied `.gba` file, inspects its header in C++, and now has a diagnostic screen that transfers a generated 240×160 ARGB frame through JNI into an Android bitmap. The original FE7 engine is not integrated, so the ROM is not executed and this is not a playable port.
 
 ## Goals
 
@@ -26,9 +26,11 @@ An experimental effort to bring a **user-supplied, legally obtained Fire Emblem:
 - [x] Basic system file picker for user-supplied `.gba` files
 - [x] Local remembered URI/name for a selected file
 - [x] C++/JNI bridge and CMake integration for local header inspection
+- [x] Diagnostic 240×160 ARGB frame generated in C++ and displayed in Android
 - [x] Host-side synthetic tests for the portable header parser (runs in CI)
 - [x] GitHub Actions workflow configured for Android SDK, NDK, and CMake
 - [ ] Verify the updated native APK build in CI and on the user's device
+- [ ] Verify the frame-test screen on the user’s physical device
 - [ ] Integrate the actual game engine/decompilation with the selected ROM
 - [ ] Boot to title screen on a real device
 - [ ] Touch controls and controller mapping
