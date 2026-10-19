@@ -20,7 +20,7 @@ class PpuRenderer final {
 public:
     explicit PpuRenderer(const MemoryBus& memory) : memory_(memory) {}
 
-    bool RenderFrame(std::uint32_t* output_rgba, std::size_t pixel_count);
+    bool RenderFrame(std::uint32_t* output_argb, std::size_t pixel_count);
 
 private:
     struct PixelState {
