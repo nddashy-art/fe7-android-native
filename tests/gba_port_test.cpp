@@ -20,6 +20,11 @@ int main() {
 
     auto* io = static_cast<volatile std::uint16_t*>(fe7_gba_io_pointer(0x04000130u, 2));
     assert(io != nullptr && *io == 0x03FFu);
+    const std::uint16_t pressed_keys = (1u << 0) | (1u << 4) | (1u << 9);
+    fe7_gba_set_keys(pressed_keys);
+    assert(*io == static_cast<std::uint16_t>(0x03FFu & ~pressed_keys));
+    fe7_gba_set_keys(0);
+    assert(*io == 0x03FFu);
     *io = 0x02FFu;
     assert(static_cast<volatile std::uint8_t*>(fe7_gba_io_pointer(0x04000131u, 1)) != nullptr);
 
