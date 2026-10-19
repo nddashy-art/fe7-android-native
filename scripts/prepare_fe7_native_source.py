@@ -108,13 +108,57 @@ void SetIrqFunc(int num, void (*func)(void))
     return True
 
 
+
+def wrap_agb_main(path: Path) -> bool:
+    """Split FE7's one-time AgbMain initialization from its infinite main loop."""
+    source = path.read_text(encoding="utf-8")
+    if "void Fe7EngineRunFrame(void)" in source:
+        return False
+    old_loop = """    for (;;)
+    {
+        RunMainFunc();
+        SoftResetIfKeyCombo();
+    }
+}
+
+void PutBuildInfo"""
+    new_loop = """#ifdef FE7_NATIVE_PORT
+    // The Android host owns frame pacing and calls Fe7EngineRunFrame().
+    return;
+#else
+    for (;;)
+    {
+        RunMainFunc();
+        SoftResetIfKeyCombo();
+    }
+#endif
+}
+
+#ifdef FE7_NATIVE_PORT
+void Fe7EngineRunFrame(void)
+{
+    RunMainFunc();
+    SoftResetIfKeyCombo();
+}
+#endif
+
+void PutBuildInfo"""
+    if old_loop not in source:
+        raise RuntimeError(f"could not locate AgbMain main loop in {path}")
+    backup = path.with_name(path.name + ".fe7native.bak")
+    if not backup.exists():
+        shutil.copy2(path, backup)
+    path.write_text(source.replace(old_loop, new_loop, 1), encoding="utf-8")
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source_root", type=Path, help="extracted FE7 decompilation root")
     args = parser.parse_args()
     root = args.source_root.resolve()
     inc = root / "include"
-    targets = [inc / "gbaio.h", inc / "gbavideo.h", inc / "hardware.h", root / "src" / "gbasram.c"]
+    targets = [inc / "gbaio.h", inc / "gbavideo.h", inc / "hardware.h", root / "src" / "gbasram.c", root / "src" / "main.c"]
     missing = [str(path) for path in targets if not path.is_file()]
     if missing:
         parser.error("source root is missing expected files: " + ", ".join(missing))
@@ -228,8 +272,10 @@ u32 (*COMMON(VerifySramFast) VerifySramFast)(void const * src, void * dst, u32 s
 }""")
     changed += wrap_dma_macro(inc / "gbaio.h")
     changed += wrap_interrupt_source(root / "src" / "interrupt.c")
+    changed += wrap_agb_main(root / "src" / "main.c")
     print(f"Native memory-header adapter applied to {root} ({changed} edits).")
     print("Backups use the .fe7native.bak suffix. This is not a game-engine build or ROM boot test.")
+    print("AgbMain is split into initialization plus Fe7EngineRunFrame() for host-owned pacing.")
     print("Compile with FE7_NATIVE_PORT defined and include app/src/main/cpp for the native API.")
     return 0
 
