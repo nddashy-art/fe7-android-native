@@ -1,6 +1,9 @@
 package org.fe7android.nativeport
 
 import android.app.Activity
+import android.media.AudioFormat
+import android.media.AudioManager
+import android.media.AudioTrack
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
@@ -33,6 +36,9 @@ class MainActivity : Activity() {
     private var gameBitmap: Bitmap? = null
     private var gameImage: ImageView? = null
     private var gameLoopActive = false
+    @Volatile private var audioLoopActive = false
+    private var audioTrack: AudioTrack? = null
+    private var audioThread: Thread? = null
     private val gameFrameBuffer: ByteBuffer = ByteBuffer.allocateDirect(GAME_FRAME_WIDTH * GAME_FRAME_HEIGHT * 4)
         .order(ByteOrder.nativeOrder())
 
@@ -61,6 +67,7 @@ class MainActivity : Activity() {
     private external fun nativeRunFrameInto(outputBuffer: ByteBuffer): Boolean
     private external fun nativeSetButtons(buttons: Int)
     private external fun nativeStopGame()
+    private external fun nativeReadAudio(output: ShortArray, maxFrames: Int): Int
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +75,7 @@ class MainActivity : Activity() {
     }
 
     private fun showLauncher() {
+        stopAudioOutput()
         gameLoopActive = false
         frameHandler.removeCallbacksAndMessages(null)
         window.decorView.systemUiVisibility = 0
@@ -169,6 +177,7 @@ class MainActivity : Activity() {
         currentPressedButtons = 0
         nativeSetButtons(0)
         gameLoopActive = true
+        startAudioOutput()
 
         // Fullscreen landscape; touch controls float over the image edges.
         window.decorView.systemUiVisibility = (
@@ -225,6 +234,7 @@ class MainActivity : Activity() {
             setOnClickListener {
                 gameLoopActive = false
                 frameHandler.removeCallbacksAndMessages(null)
+                stopAudioOutput()
                 nativeSetButtons(0)
                 nativeStopGame()
                 gameBitmap = null
