@@ -49,6 +49,19 @@ def main() -> int:
             subprocess.run(command, check=True)
             objects.append(obj)
 
+        # AgbMain is compiled as an object only: the full game entrypoint has
+        # unresolved engine services by design and must not be linked yet.
+        startup_source = source_dir / "main.c"
+        startup_object = output / "main-startup-probe.o"
+        subprocess.run(
+            [
+                compiler, "-std=gnu11", "-fPIC", "-fno-common",
+                "-Wall", "-Wextra", "-DFE7_NATIVE_PORT=1",
+                f"-I{include}", "-c", str(startup_source), "-o", str(startup_object),
+            ],
+            check=True,
+        )
+
         shared = output / "libfe7-native-data-slice.so"
         subprocess.run(
             [compiler, "-shared", *(str(obj) for obj in objects), "-o", str(shared)],
@@ -57,8 +70,14 @@ def main() -> int:
         if not shared.is_file() or shared.stat().st_size == 0:
             print("Shared-object link did not produce output.", file=sys.stderr)
             return 1
+        if not startup_object.is_file() or startup_object.stat().st_size == 0:
+            print("AgbMain compile probe did not produce an object.", file=sys.stderr)
+            return 1
 
-    print(f"FE7 native data-slice smoke test passed: compiled and linked {len(UNITS)} source translation units.")
+    print(
+        f"FE7 native source smoke test passed: compiled and linked {len(UNITS)} data units "
+        "and compiled src/main.c as an isolated AgbMain object."
+    )
     return 0
 
 
