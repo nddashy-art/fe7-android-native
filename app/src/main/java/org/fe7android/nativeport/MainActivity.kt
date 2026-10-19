@@ -44,6 +44,10 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        showLauncher()
+    }
+
+    private fun showLauncher() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
