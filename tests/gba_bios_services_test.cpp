@@ -6,14 +6,15 @@
 #include <cstdint>
 #include <cstdio>
 
+struct BgAffineSetSrc { std::int32_t tex_x, tex_y; std::int16_t scr_x, scr_y, sx, sy; std::uint16_t alpha; };
+struct BgAffineSetDst { std::int16_t pa, pb, pc, pd; std::int32_t dx, dy; };
+struct ObjAffineSetSrc { std::int16_t x_scale, y_scale; std::uint16_t rotation; };
+
 namespace {
 int g_vblank_calls = 0;
 int g_reset_calls = 0;
 void VBlankCallback() { ++g_vblank_calls; }
 void ResetCallback() { ++g_reset_calls; }
-struct BgSrc { std::int32_t tex_x, tex_y; std::int16_t scr_x, scr_y, sx, sy; std::uint16_t alpha; };
-struct BgDst { std::int16_t pa, pb, pc, pd; std::int32_t dx, dy; };
-struct ObjSrc { std::int16_t x_scale, y_scale; std::uint16_t rotation; };
 }
 
 int main() {
@@ -28,14 +29,14 @@ int main() {
     assert(ArcTan2(1, 0) > 0x3FF0u && ArcTan2(1, 0) < 0x4010u);
     assert(ArcTan2(0, 1) == 0u);
 
-    BgSrc bg_source{0x1000, 0x2000, 0, 0, 0x100, 0x100, 0};
-    BgDst bg_destination{};
+    BgAffineSetSrc bg_source{0x1000, 0x2000, 0, 0, 0x100, 0x100, 0};
+    BgAffineSetDst bg_destination{};
     BgAffineSet(&bg_source, &bg_destination, 1);
     assert(bg_destination.pa == 0x100 && bg_destination.pb == 0);
     assert(bg_destination.pc == 0 && bg_destination.pd == 0x100);
     assert(bg_destination.dx == bg_source.tex_x && bg_destination.dy == bg_source.tex_y);
 
-    ObjSrc obj_source{0x100, 0x100, 0};
+    ObjAffineSetSrc obj_source{0x100, 0x100, 0};
     std::array<std::uint8_t, 32> obj_destination{};
     ObjAffineSet(&obj_source, obj_destination.data(), 1, 8);
     assert(obj_destination[0] == 0x00 && obj_destination[1] == 0x01);
