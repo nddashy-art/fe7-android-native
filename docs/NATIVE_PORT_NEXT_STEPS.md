@@ -23,3 +23,12 @@ The supplied FE7 US decompilation archive has been inventoried and its checksum 
 ## Verification rule
 
 The current opt-in source slice is only proof that authentic FE7 C data modules compile and are packaged; it does not call `AgbMain`, render a frame, play FE7 audio, or reach the title screen. Do not report a playable native port until an Android device boots the actual FE7 engine to its title screen. Keep ROMs and proprietary extracted assets out of Git and CI.
+
+## Startup trace from the supplied source archive (2026-10-19)
+
+A closer read of the actual `fe7_us-main/src/main.c` shows that the startup boundary is deeper than a simple `AgbMain` wrapper. Before reaching the host-owned frame loop, `AgbMain` calls `ClearEwram`, programs `REG_WAITCNT`, initializes IRQ/VBlank and key state, calls `InitRamFuncs`, `SramInit`, `InitProcs`, `InitSpriteAnims`, `InitMus`, seeds two RNG paths, calls `func_0809F924`, `m4aSoundInit`, `func_08003F6C`, sets `OnVBlank`, sets language, and calls `StartGame()`. Only after that does the original infinite loop begin.
+
+The archive's public headers declare `StartGame` and multiple unknown startup routines, but the supplied source slice does not define them as ordinary C functions; some are in the game's assembly/data units. Therefore compiling `main.c` alone (or adapting its infinite loop) is not evidence that startup can execute. A valid native boot needs the real implementations/data for this chain plus host replacements for the GBA hardware/BIOS operations it reaches.
+
+**Current result:** this trace narrows the next work item, but does not change the status of the APK. The shipped gameplay route still uses mGBA. Do not label or distribute it as a native FE7 engine build until an actual native startup path links and reaches a title-screen frame.
+
