@@ -2,7 +2,7 @@
 
 An experimental effort to bring a **user-supplied, legally obtained Fire Emblem: The Blazing Blade (US)** build to Android, with touch controls, controller support, and eventually optional local-network multiplayer and mod support.
 
-> **Current status: launcher and native-diagnostics prototype only.** The app selects and remembers a user-supplied `.gba` file, inspects its header in C++, and now has a diagnostic screen that transfers a generated 240×160 ARGB frame through JNI into an Android bitmap. The original FE7 engine is not integrated, so the ROM is not executed and this is not a playable port.
+> **Current status: mGBA-backed Android gameplay prototype plus an incomplete native runtime.** The app selects a user-supplied `.gba` file and mGBA executes it. The experimental software GBA bus now attaches the same ROM buffer and has isolated host tests, and a real FE7 C source slice compiles in CI. However, the original FE7 engine entrypoint (`AgbMain`), CPU execution path, full timing, renderer and audio are not integrated; this is not yet a native FE7 port.
 
 ## Goals
 
@@ -16,7 +16,7 @@ An experimental effort to bring a **user-supplied, legally obtained Fire Emblem:
 ## Legal and source-content policy
 
 - **Do not commit a commercial ROM, BIOS, copyrighted game assets, or extracted proprietary data to this repository or CI artifacts.**
-- The app's ROM picker remembers a document URI on the device. The current prototype does not upload the selected file or pass it to a game engine.
+- The app reads the selected ROM locally and passes it to the bundled mGBA core for gameplay; it does not upload the ROM. The software native runtime borrows the in-memory buffer for diagnostics and detaches before that buffer is released.
 - This project is unofficial and is not affiliated with or endorsed by Nintendo.
 - The presence of a decompilation does not itself make it an Android port; platform integration and testing remain necessary.
 
@@ -29,9 +29,9 @@ An experimental effort to bring a **user-supplied, legally obtained Fire Emblem:
 - [x] Diagnostic 240×160 ARGB frame generated in C++ and displayed in Android
 - [x] Host-side synthetic tests for the portable header parser (runs in CI)
 - [x] GitHub Actions workflow configured for Android SDK, NDK, and CMake
-- [ ] Verify the updated native APK build in CI and on the user's device
+- [x] Verify the Android debug APK build in GitHub Actions (native FE7 gameplay remains unverified)
 - [ ] Verify the frame-test screen on the user’s physical device
-- [ ] Integrate the actual game engine/decompilation with the selected ROM
+- [ ] Link and execute the actual FE7 game engine/decompilation against the selected ROM
 - [ ] Boot to title screen on a real device
 - [ ] Touch controls and controller mapping
 - [ ] Persistent game saves and lifecycle handling
