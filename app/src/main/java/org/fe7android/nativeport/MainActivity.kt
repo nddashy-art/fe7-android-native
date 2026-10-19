@@ -18,6 +18,8 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.Locale
 
 /**
@@ -31,6 +33,8 @@ class MainActivity : Activity() {
     private var gameBitmap: Bitmap? = null
     private var gameImage: ImageView? = null
     private var gameLoopActive = false
+    private val gameFrameBuffer: ByteBuffer = ByteBuffer.allocateDirect(GAME_FRAME_WIDTH * GAME_FRAME_HEIGHT * 4)
+        .order(ByteOrder.nativeOrder())
 
     companion object {
         private const val REQUEST_OPEN_ROM = 4107
@@ -54,6 +58,7 @@ class MainActivity : Activity() {
     private external fun nativeCreateTestFrame(): IntArray
     private external fun nativeStartGame(romPath: String): String
     private external fun nativeRunFrame(): IntArray
+    private external fun nativeRunFrameInto(outputBuffer: ByteBuffer): Boolean
     private external fun nativeSetButtons(buttons: Int)
     private external fun nativeStopGame()
 
@@ -271,13 +276,15 @@ class MainActivity : Activity() {
     private fun renderGameFrame() {
         if (!gameLoopActive) return
         try {
-            val pixels = nativeRunFrame()
             val bitmap = gameBitmap
             val image = gameImage
-            if (pixels.size == GAME_FRAME_WIDTH * GAME_FRAME_HEIGHT &&
-                bitmap != null && image != null) {
-                bitmap.setPixels(pixels, 0, GAME_FRAME_WIDTH, 0, 0, GAME_FRAME_WIDTH, GAME_FRAME_HEIGHT)
-                image.invalidate()
+            if (bitmap != null && image != null) {
+                gameFrameBuffer.clear()
+                if (nativeRunFrameInto(gameFrameBuffer)) {
+                    gameFrameBuffer.position(0)
+                    bitmap.copyPixelsFromBuffer(gameFrameBuffer)
+                    image.invalidate()
+                }
             }
         } catch (_: Exception) {
             gameLoopActive = false
