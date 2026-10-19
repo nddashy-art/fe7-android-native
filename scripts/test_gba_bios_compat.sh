@@ -8,6 +8,7 @@ PORT_BIN="${TMPDIR:-/tmp}/fe7-gba-port-test"
 SERVICES_BIN="${TMPDIR:-/tmp}/fe7-gba-bios-services-test"
 DMA_BIN="${TMPDIR:-/tmp}/fe7-gba-dma-test"
 IRQ_BIN="${TMPDIR:-/tmp}/fe7-gba-irq-test"
+FRAME_BIN="${TMPDIR:-/tmp}/fe7-gba-frame-clock-test"
 STARTUP_BIN="${TMPDIR:-/tmp}/fe7-engine-startup-test"
 PPU_BIN="${TMPDIR:-/tmp}/fe7-gba-ppu-test"
 COMMON="-std=c++17 -Wall -Wextra -Werror"
@@ -53,6 +54,16 @@ COMMON="-std=c++17 -Wall -Wextra -Werror"
   "$ROOT/app/src/main/cpp/gba_irq.cpp" \
   "$ROOT/tests/gba_irq_test.cpp" -o "$IRQ_BIN"
 "$IRQ_BIN"
+"$CXX" $COMMON -I"$ROOT/app/src/main/cpp" \
+  "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
+  "$ROOT/app/src/main/cpp/gba_memory.cpp" \
+  "$ROOT/app/src/main/cpp/gba_port.cpp" \
+  "$ROOT/app/src/main/cpp/gba_ppu.cpp" \
+  "$ROOT/app/src/main/cpp/gba_dma.cpp" \
+  "$ROOT/app/src/main/cpp/gba_irq.cpp" \
+  "$ROOT/app/src/main/cpp/gba_frame_clock.cpp" \
+  "$ROOT/tests/gba_frame_clock_test.cpp" -o "$FRAME_BIN"
+"$FRAME_BIN"
 "$CXX" $COMMON -I"$ROOT/app/src/main/cpp" \
   "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
   "$ROOT/app/src/main/cpp/gba_memory.cpp" \
@@ -106,4 +117,4 @@ with tempfile.TemporaryDirectory() as tmp:
     assert path.read_text(encoding="utf-8") == adapted
 print("FE7 AgbMain adapter regression test passed")
 PYTEST
-rm -f "$BIOS_BIN" "$MEMORY_BIN" "$PORT_BIN" "$SERVICES_BIN" "$DMA_BIN" "$IRQ_BIN" "$STARTUP_BIN" "$PPU_BIN"
+rm -f "$BIOS_BIN" "$MEMORY_BIN" "$PORT_BIN" "$SERVICES_BIN" "$DMA_BIN" "$IRQ_BIN" "$FRAME_BIN" "$STARTUP_BIN" "$PPU_BIN"
