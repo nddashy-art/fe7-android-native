@@ -227,13 +227,13 @@ void PpuRenderer::RenderObjects() {
         RenderObject(i);
 }
 
-bool PpuRenderer::RenderFrame(std::uint32_t* output_rgba, std::size_t pixel_count) {
-    if (output_rgba == nullptr || pixel_count < kPpuFramePixels) return false;
+bool PpuRenderer::RenderFrame(std::uint32_t* output_argb, std::size_t pixel_count) {
+    if (output_argb == nullptr || pixel_count < kPpuFramePixels) return false;
     std::uint16_t display_control = 0;
     if (!Read16(memory_, kDisplayControl, &display_control)) return false;
 
     if ((display_control & kForcedBlank) != 0) {
-        std::fill(output_rgba, output_rgba + kPpuFramePixels, 0xFFFFFFFFu);
+        std::fill(output_argb, output_argb + kPpuFramePixels, 0xFFFFFFFFu);
         return true;
     }
 
@@ -264,7 +264,7 @@ bool PpuRenderer::RenderFrame(std::uint32_t* output_rgba, std::size_t pixel_coun
 
     if (mode <= 1) RenderObjects();
     for (std::size_t i = 0; i < kPpuFramePixels; ++i)
-        output_rgba[i] = pixels_[i].color;
+        output_argb[i] = pixels_[i].color;
     return true;
 }
 
