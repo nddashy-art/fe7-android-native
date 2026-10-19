@@ -45,9 +45,16 @@ class PrepareSourceAdapterTest(unittest.TestCase):
                 'void SetIrqFunc(int num, void (*func)(void)) { IntrFuncTable[num] = func; }\n'
             )
             (source / "interrupt.c").write_text(original_interrupt, encoding="utf-8")
+            original_main = (
+                'void AgbMain(void)\\n{\\n    InitGame();\\n    for (;;)\\n'
+                '    {\\n        RunMainFunc();\\n        SoftResetIfKeyCombo();\\n'
+                '    }\\n}\\n\\nvoid PutBuildInfo(u16 * tm)\\n{\\n}\\n'
+            )
+            (source / "main.c").write_text(original_main, encoding="utf-8")
             original_gbaio = (include / "gbaio.h").read_bytes()
             original_sram_bytes = (source / "gbasram.c").read_bytes()
             original_interrupt_bytes = (source / "interrupt.c").read_bytes()
+            original_main_bytes = (source / "main.c").read_bytes()
 
             first = subprocess.run([sys.executable, str(PATCHER), str(root)],
                                    check=True, capture_output=True, text=True)
@@ -71,7 +78,11 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             self.assertIn("fe7_gba_dispatch_pending_irqs", interrupt_patched)
             self.assertIn("#else\nextern void IntrMain(void);", interrupt_patched)
             self.assertEqual((source / "interrupt.c.fe7native.bak").read_bytes(), original_interrupt_bytes)
-            self.assertIn("(9 edits)", first.stdout)
+            main_patched = (source / "main.c").read_text(encoding="utf-8")
+            self.assertIn("void Fe7EngineRunFrame(void)", main_patched)
+            self.assertIn("#ifdef FE7_NATIVE_PORT", main_patched)
+            self.assertEqual((source / "main.c.fe7native.bak").read_bytes(), original_main_bytes)
+            self.assertIn("(10 edits)", first.stdout)
             self.assertIn("(0 edits)", second.stdout)
             self.assertTrue((include / "gba_port.h").is_file())
 
