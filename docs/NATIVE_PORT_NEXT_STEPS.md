@@ -1,13 +1,13 @@
 # FE7 native-port implementation roadmap
 
-The supplied FE7 US decompilation archive has been inventoried and its checksum recorded in `docs/FE7_SOURCE_ARCHIVE_INVENTORY.md`. The repository now has the software GBA runtime foundation and an opt-in Android build path that compiles and links 13 genuine, ROM-independent FE7 C translation units. The actual gameplay engine is still not linked or booted.
+The supplied FE7 US decompilation archive has been inventoried and its checksum recorded in `docs/FE7_SOURCE_ARCHIVE_INVENTORY.md`. The repository now has the software GBA runtime foundation and an opt-in Android build path that compiles and links 13 genuine, low-dependency FE7 C translation units. The actual gameplay engine is still not linked or booted.
 
 ## Completed milestones
 
 - Software GBA memory bus plus initial BIOS-compatible helpers, DMA and IRQ services, with host tests.
 - Source adapter script that conditionally maps GBA memory/registers, DMA, interrupts, SRAM fast routines and the `AgbMain` loop to the host bridge. The script is regression-tested but does not mean every adapted engine file compiles.
 - Optional `FE7_SOURCE_ROOT` CMake/Gradle wiring for the local FE7 decompilation.
-- First authentic source slice: 13 FE7 C translation units compile/link into the native library with the local source root enabled. Five additional service/game translation units (`async_upload.c`, `audio.c`, `event.c`, `gbasram.c`, `interrupt.c`) and `main.c` compile as isolated objects.
+- First authentic source slice: 13 low-dependency FE7 C translation units compile/link into the native library with the local source root enabled. Five additional service/game translation units (`async_upload.c`, `audio.c`, `event.c`, `gbasram.c`, `interrupt.c`) and `main.c` compile as isolated objects.
 - The C sound driver `m4a.c` also compiles to an isolated object for `armeabi-v7a` (but is not linked/executed). Eight original ARM assembly units compile as objects for the `armeabi-v7a` ABI only; these assembly objects are not yet linked or executed.
 
 ## Next engineering sequence
