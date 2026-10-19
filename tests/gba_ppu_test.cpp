@@ -50,7 +50,7 @@ void TestAffineBackgroundAndWraparound() {
 
     // Mode 1: BG2 is affine; a 256x256 tile map is sufficient for this frame.
     Write16(memory, kDisplayControl, 1u | (1u << 10));
-    Write16(memory, kBgControl + 4u, (31u << 8) | (1u << 14));
+    Write16(memory, kBg0Control + 4u, (31u << 8) | (1u << 14));
     Write16(memory, kPalette + 2u, 0x001Fu); // Palette index 1 = red.
     for (unsigned i = 0; i < 32u * 32u; ++i)
         assert(memory.Write8(kVram + 31u * 0x800u + i, 1u));
@@ -75,7 +75,7 @@ void TestAffineBackgroundAndWraparound() {
 
     // With the hardware wrap flag, the same coordinate wraps to X=0.
     auto* bg2_control = static_cast<volatile std::uint16_t*>(
-        memory.ResolveIoRegister(kBgControl + 4u, 2u));
+        memory.ResolveIoRegister(kBg0Control + 4u, 2u));
     assert(bg2_control != nullptr);
     *bg2_control = static_cast<std::uint16_t>(*bg2_control | (1u << 13));
     assert(ppu.RenderFrame(frame.data(), frame.size()));
