@@ -48,3 +48,8 @@ Reference: https://github.com/nddashy-art/tmc/blob/master/docs/audio-pipeline-au
 On an ARMv7 Android-target Clang assembler, these eight source units compile to object files without linking: `asm/code.s` (from a copy with one adjacent duplicate local-label declaration removed), `asm/code_1.s`, `asm/event.s`, `asm/fake_glue.s`, `src/armfunc.s`, `src/crt0.s`, `src/gbasvc.s`, and `src/sio_link_loader.s`. The duplicate-label normalizer is in `scripts/prepare_fe7_native_assembly.py`, with hermetic unit tests in `tests/test_prepare_fe7_native_assembly.py`.
 
 This is strictly a compile probe for the `armeabi-v7a` ABI, not a link/runtime result. The original objects rely on the GBA memory map and game data. `asm/data.s` / `asm/rodata.s` require `baserom.gba` via `.incbin`, and `src/m4a_1.s` still requires assembler compatibility work. No ROM or extracted game assets are added to the public repo or CI.
+
+
+## Additional authentic C translation-unit probes
+
+The opt-in Android native target also compile-probes `src/async_upload.c`, `src/audio.c`, `src/event.c`, `src/gbasram.c`, and `src/interrupt.c` for the configured Android ABI. These are not linked into the shipped native library yet: the goal is to expose compiler/ABI incompatibilities and begin resolving engine dependencies without leaving unresolved symbols in the app's shared library. `src/m4a.c` remains excluded because its GBA BIOS `swi` instruction is not directly valid for Android userspace, especially ARM64.
