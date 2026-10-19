@@ -25,7 +25,7 @@ int main() {
                     (static_cast<std::uint32_t>(0x9360u) << 16) | 3u);
     assert(vblank_dst[0] == 0 && vblank_dst[1] == 0);
     fe7_gba_dma_on_vblank();
-    for (std::size_t i = 0; i < 3; ++i) assert(vblank_dst[i] == vblank_src[i]);
+    for (std::size_t i = 0; i < 3; ++i) assert(vblank_dst[i] == vblank_src[0]);
     vblank_dst[0] = 0;
     fe7_gba_dma_on_vblank();
     assert(vblank_dst[0] == vblank_src[0]);
