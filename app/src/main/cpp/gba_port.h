@@ -17,6 +17,13 @@ void* fe7_gba_resolve_pointer(uintptr_t address_or_host_pointer, size_t length, 
 void fe7_gba_dma_set(unsigned channel, const void* source, void* destination, uint32_t control);
 void fe7_gba_dma_on_vblank(void);
 void fe7_gba_dma_on_hblank(unsigned scanline);
+void fe7_gba_set_irq_handler(unsigned index, void (*handler)(void));
+void fe7_gba_irq_clear(uint16_t flags);
+void fe7_gba_irq_raise(uint16_t flags);
+void fe7_gba_dispatch_pending_irqs(void);
+void IntrWait(int8_t wait_next, uint16_t intr_flags);
+void Halt(void);
+void Stop(void);
 void** fe7_gba_interrupt_vector_slot(void);
 
 struct BgAffineSetSrc;
