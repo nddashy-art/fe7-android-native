@@ -231,7 +231,10 @@ void PpuRenderer::RenderObject(unsigned oam_index) {
         !Read16(memory_, entry + 4u, &attr2)) return;
 
     const bool affine = (attr0 & kOamAttr0Affine) != 0;
-    if (affine) return;  // Affine OBJ matrices are not implemented in this baseline.
+    if (affine) {
+        RenderAffineObject(oam_index);
+        return;
+    }
     if ((attr0 & kOamAttr0Disable) != 0) return;
     const unsigned object_mode = (attr0 & kOamAttr0ModeMask) >> 10;
     if (object_mode != 0) return;  // Blending/OBJ-window behavior needs later renderer work.
@@ -293,6 +296,121 @@ void PpuRenderer::RenderObject(unsigned oam_index) {
                 palette_index = ((attr2 >> 12) & 0x0Fu) * 16u + nibble;
             }
             if (color256 && palette_index == 0) continue;
+
+            const std::size_t pixel =
+                static_cast<std::size_t>(screen_y) * kPpuFrameWidth +
+                static_cast<unsigned>(screen_x);
+            if (object_rank < pixels_[pixel].rank) {
+                pixels_[pixel].rank = object_rank;
+                pixels_[pixel].color = ReadPaletteColor(256u + palette_index);
+            }
+        }
+    }
+}
+
+
+void PpuRenderer::RenderAffineObject(unsigned oam_index) {
+    std::uint16_t display_control = 0;
+    if (!Read16(memory_, kDisplayControl, &display_control) ||
+        (display_control & kObjEnable) == 0) return;
+    const bool one_dimensional = (display_control & kObjOneDimensional) != 0;
+
+    std::uint16_t attr0 = 0, attr1 = 0, attr2 = 0;
+    const std::uint32_t entry = kPpuOamBase + oam_index * 8u;
+    if (!Read16(memory_, entry, &attr0) ||
+        !Read16(memory_, entry + 2u, &attr1) ||
+        !Read16(memory_, entry + 4u, &attr2)) return;
+    if ((attr0 & kOamAttr0Affine) == 0) return;
+
+    // Semi-transparent and OBJ-window modes need the blend/window pipeline.
+    const unsigned object_mode = (attr0 & kOamAttr0ModeMask) >> 10;
+    if (object_mode != 0) return;
+
+    const unsigned shape = (attr0 & kOamAttr0ShapeMask) >> 14;
+    const unsigned size = (attr1 >> 14) & 3u;
+    unsigned width = 0, height = 0;
+    if (!ShapeSize(shape, size, &width, &height)) return;
+
+    // For affine objects bit 9 means double-size, not OBJ disable.
+    const bool double_size = (attr0 & kOamAttr0Disable) != 0;
+    const unsigned output_width = width * (double_size ? 2u : 1u);
+    const unsigned output_height = height * (double_size ? 2u : 1u);
+    int object_x = static_cast<int>(attr1 & 0x1FFu);
+    int object_y = static_cast<int>(attr0 & 0xFFu);
+    if (object_x >= 256) object_x -= 512;
+    if (object_y >= 160) object_y -= 256;
+
+    // Affine parameters occupy attr3 halfwords in each four-entry OAM group.
+    const unsigned matrix_index = (attr1 >> 9) & 31u;
+    const std::uint32_t matrix = kPpuOamBase + matrix_index * 32u + 6u;
+    std::uint16_t pa_bits = 0, pb_bits = 0, pc_bits = 0, pd_bits = 0;
+    if (!Read16(memory_, matrix, &pa_bits) ||
+        !Read16(memory_, matrix + 8u, &pb_bits) ||
+        !Read16(memory_, matrix + 16u, &pc_bits) ||
+        !Read16(memory_, matrix + 24u, &pd_bits)) return;
+    const auto pa = static_cast<std::int16_t>(pa_bits);
+    const auto pb = static_cast<std::int16_t>(pb_bits);
+    const auto pc = static_cast<std::int16_t>(pc_bits);
+    const auto pd = static_cast<std::int16_t>(pd_bits);
+    const auto fixed_floor_8 = [](std::int64_t value) -> std::int64_t {
+        return value >= 0 ? value / 256 : -((-value + 255) / 256);
+    };
+
+    const bool color256 = (attr0 & kOamAttr0Color256) != 0;
+    const unsigned tile_base = color256 ? ((attr2 & 0x3FFu) & ~1u) : (attr2 & 0x3FFu);
+    const unsigned tile_bytes = color256 ? 64u : 32u;
+    const unsigned tiles_wide = width / 8u;
+    const unsigned object_priority = (attr2 >> 10) & 3u;
+    const std::uint16_t object_rank =
+        static_cast<std::uint16_t>(object_priority * 1000u + oam_index);
+
+    for (unsigned dy = 0; dy < output_height; ++dy) {
+        const int screen_y = object_y + static_cast<int>(dy);
+        if (screen_y < 0 || screen_y >= static_cast<int>(kPpuFrameHeight)) continue;
+        const std::int64_t relative_y = static_cast<std::int64_t>(dy) - output_height / 2u;
+        for (unsigned dx = 0; dx < output_width; ++dx) {
+            const int screen_x = object_x + static_cast<int>(dx);
+            if (screen_x < 0 || screen_x >= static_cast<int>(kPpuFrameWidth)) continue;
+            const std::int64_t relative_x = static_cast<std::int64_t>(dx) - output_width / 2u;
+            const std::int64_t source_x_8 =
+                static_cast<std::int64_t>(pa) * relative_x +
+                static_cast<std::int64_t>(pb) * relative_y;
+            const std::int64_t source_y_8 =
+                static_cast<std::int64_t>(pc) * relative_x +
+                static_cast<std::int64_t>(pd) * relative_y;
+            const std::int64_t source_x_wide = fixed_floor_8(source_x_8) + width / 2u;
+            const std::int64_t source_y_wide = fixed_floor_8(source_y_8) + height / 2u;
+            if (source_x_wide < 0 || source_y_wide < 0 ||
+                source_x_wide >= width || source_y_wide >= height) continue;
+            const unsigned source_x = static_cast<unsigned>(source_x_wide);
+            const unsigned source_y = static_cast<unsigned>(source_y_wide);
+            const unsigned tile_x = source_x >> 3;
+            const unsigned tile_y = source_y >> 3;
+            const unsigned tile_offset = one_dimensional
+                ? (tile_y * tiles_wide + tile_x) * tile_bytes
+                : tile_y * 0x400u + tile_x * tile_bytes;
+            const std::uint32_t tile_address = kPpuVramBase + 0x10000u +
+                tile_base * 32u + tile_offset;
+            if (tile_address < kPpuVramBase + 0x10000u ||
+                tile_address >= kPpuVramBase + 0x18000u) continue;
+
+            const unsigned within_x = source_x & 7u;
+            const unsigned within_y = source_y & 7u;
+            const std::uint32_t pixel_address = tile_address +
+                (color256 ? within_y * 8u + within_x
+                          : within_y * 4u + within_x / 2u);
+            std::uint8_t packed = 0;
+            if (!memory_.Read8(pixel_address, &packed)) continue;
+
+            unsigned palette_index = 0;
+            if (color256) {
+                palette_index = packed;
+            } else {
+                const unsigned nibble = (within_x & 1u) ? (packed >> 4) : (packed & 0x0Fu);
+                if (nibble == 0) continue;
+                palette_index = ((attr2 >> 12) & 0x0Fu) * 16u + nibble;
+            }
+            if (palette_index == 0) continue;
 
             const std::size_t pixel =
                 static_cast<std::size_t>(screen_y) * kPpuFrameWidth +
