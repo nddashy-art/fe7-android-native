@@ -30,9 +30,11 @@ COMMON="-std=c++17 -Wall -Wextra -Werror"
   "$ROOT/app/src/main/cpp/gba_port.cpp" \
   "$ROOT/app/src/main/cpp/gba_bios_services.cpp" \
   "$ROOT/app/src/main/cpp/gba_dma.cpp" \
+  "$ROOT/app/src/main/cpp/gba_irq.cpp" \
   "$ROOT/tests/gba_bios_services_test.cpp" -o "$SERVICES_BIN"
 "$SERVICES_BIN"
 "$CXX" $COMMON -I"$ROOT/app/src/main/cpp" \
+  "$ROOT/app/src/main/cpp/gba_bios_compat.cpp" \
   "$ROOT/app/src/main/cpp/gba_memory.cpp" \
   "$ROOT/app/src/main/cpp/gba_port.cpp" \
   "$ROOT/app/src/main/cpp/gba_dma.cpp" \
