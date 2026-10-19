@@ -171,8 +171,8 @@ Java_org_fe7android_nativeport_MainActivity_nativeStartGame(JNIEnv* env, jobject
     retro_get_system_info(&info);
     retro_game_info game{};
     game.path = path_string.c_str();
-    game.data = g_rom.data();
-    game.size = g_rom.size();
+    game.data = info.need_fullpath ? nullptr : g_rom.data();
+    game.size = info.need_fullpath ? 0 : g_rom.size();
     game.meta = nullptr;
 
     if (!retro_load_game(&game)) {
