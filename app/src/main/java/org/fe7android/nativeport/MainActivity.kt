@@ -261,7 +261,7 @@ class MainActivity : Activity() {
             sampleRate,
             AudioFormat.CHANNEL_OUT_STEREO,
             AudioFormat.ENCODING_PCM_16BIT,
-            maxOf(minBytes * 2, 8192),
+            maxOf(minBytes, 4096),
             AudioTrack.MODE_STREAM
         )
         if (track.state != AudioTrack.STATE_INITIALIZED) {
@@ -272,10 +272,10 @@ class MainActivity : Activity() {
         audioLoopActive = true
         track.play()
         audioThread = Thread({
-            val samples = ShortArray(2048 * 2)
+            val samples = ShortArray(512 * 2)
             while (audioLoopActive) {
                 try {
-                    val frames = nativeReadAudio(samples, 2048)
+                    val frames = nativeReadAudio(samples, 512)
                     if (frames > 0) {
                         var offset = 0
                         val sampleCount = frames * 2
