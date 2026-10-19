@@ -8,6 +8,7 @@
 
 namespace {
 fe7::gba::MemoryBus g_memory;
+void* g_interrupt_vector = nullptr;
 
 void* ResolveLegacyPointer(const void* pointer, std::size_t length, bool write_access) {
     if (pointer == nullptr) return nullptr;
@@ -74,6 +75,7 @@ extern "C" int fe7_gba_attach_rom(const uint8_t* data, size_t size) {
 }
 extern "C" void fe7_gba_detach_rom(void) { g_memory.DetachRom(); }
 extern "C" void fe7_gba_reset(int clear_ewram) { g_memory.Reset(clear_ewram != 0); }
+extern "C" void** fe7_gba_interrupt_vector_slot(void) { return &g_interrupt_vector; }
 extern "C" volatile void* fe7_gba_io_pointer(uint32_t address, size_t length) {
     return g_memory.ResolveIoRegister(address, length);
 }
