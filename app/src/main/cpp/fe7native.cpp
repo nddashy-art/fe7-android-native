@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <mutex>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -23,6 +24,53 @@ unsigned g_width = kFrameWidth;
 unsigned g_height = kFrameHeight;
 unsigned g_pixel_format = RETRO_PIXEL_FORMAT_XRGB8888;
 unsigned g_buttons = 0;
+
+// Bounded stereo PCM queue shared by the emulation and Android audio threads.
+constexpr std::size_t kAudioQueueFrames = 32768;
+std::int16_t g_audio_queue[kAudioQueueFrames * 2]{};
+std::size_t g_audio_read = 0;
+std::size_t g_audio_write = 0;
+std::size_t g_audio_count = 0;
+std::mutex g_audio_mutex;
+
+void QueueAudio(const std::int16_t* samples, std::size_t frames) {
+    if (samples == nullptr || frames == 0) return;
+    std::lock_guard<std::mutex> lock(g_audio_mutex);
+    // If the consumer falls behind, discard the oldest samples to keep audio live.
+    if (frames >= kAudioQueueFrames) {
+        samples += (frames - kAudioQueueFrames) * 2;
+        frames = kAudioQueueFrames;
+        g_audio_read = g_audio_write = g_audio_count = 0;
+    }
+    while (g_audio_count + frames > kAudioQueueFrames) {
+        g_audio_read = (g_audio_read + 1) % kAudioQueueFrames;
+        --g_audio_count;
+    }
+    for (std::size_t i = 0; i < frames; ++i) {
+        g_audio_queue[g_audio_write * 2] = samples[i * 2];
+        g_audio_queue[g_audio_write * 2 + 1] = samples[i * 2 + 1];
+        g_audio_write = (g_audio_write + 1) % kAudioQueueFrames;
+        ++g_audio_count;
+    }
+}
+
+std::size_t ReadAudio(std::int16_t* output, std::size_t capacity_frames) {
+    if (output == nullptr || capacity_frames == 0) return 0;
+    std::lock_guard<std::mutex> lock(g_audio_mutex);
+    const std::size_t frames = std::min(capacity_frames, g_audio_count);
+    for (std::size_t i = 0; i < frames; ++i) {
+        output[i * 2] = g_audio_queue[g_audio_read * 2];
+        output[i * 2 + 1] = g_audio_queue[g_audio_read * 2 + 1];
+        g_audio_read = (g_audio_read + 1) % kAudioQueueFrames;
+    }
+    g_audio_count -= frames;
+    return frames;
+}
+
+void ClearAudio() {
+    std::lock_guard<std::mutex> lock(g_audio_mutex);
+    g_audio_read = g_audio_write = g_audio_count = 0;
+}
 
 bool Environment(unsigned command, void* data) {
     switch (command) {
@@ -73,8 +121,14 @@ void VideoRefresh(const void* data, unsigned width, unsigned height, size_t pitc
     }
 }
 
-void AudioSample(std::int16_t, std::int16_t) {}
-size_t AudioSampleBatch(const std::int16_t*, size_t frames) { return frames; }
+void AudioSample(std::int16_t left, std::int16_t right) {
+    const std::int16_t sample[2] = {left, right};
+    QueueAudio(sample, 1);
+}
+size_t AudioSampleBatch(const std::int16_t* data, size_t frames) {
+    QueueAudio(data, frames);
+    return frames;
+}
 void InputPoll() {}
 std::int16_t InputState(unsigned port, unsigned device, unsigned index, unsigned id) {
     if (port != 0 || device != RETRO_DEVICE_JOYPAD || index != 0 || id >= 32) return 0;
@@ -95,6 +149,7 @@ void StopCore() {
     g_width = kFrameWidth;
     g_height = kFrameHeight;
     g_buttons = 0;
+    ClearAudio();
 }
 
 jstring NewError(JNIEnv* env, const std::string& message) {
@@ -264,4 +319,22 @@ Java_org_fe7android_nativeport_MainActivity_nativeCreateTestFrame(JNIEnv* env, j
     if (result == nullptr) return nullptr;
     env->SetIntArrayRegion(result, 0, static_cast<jsize>(pixels.size()), pixels.data());
     return result;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_org_fe7android_nativeport_MainActivity_nativeReadAudio(
+    JNIEnv* env, jobject, jshortArray output_array, jint max_frames) {
+    if (output_array == nullptr || max_frames <= 0) return 0;
+    const jsize capacity = env->GetArrayLength(output_array);
+    const std::size_t frames = std::min(
+        static_cast<std::size_t>(max_frames),
+        static_cast<std::size_t>(capacity) / 2);
+    if (frames == 0) return 0;
+    std::vector<std::int16_t> samples(frames * 2);
+    const std::size_t count = ReadAudio(samples.data(), frames);
+    if (count > 0) {
+        env->SetShortArrayRegion(output_array, 0, static_cast<jsize>(count * 2),
+                                 reinterpret_cast<const jshort*>(samples.data()));
+    }
+    return static_cast<jint>(count);
 }
