@@ -31,6 +31,9 @@ public:
     bool AttachRom(const std::uint8_t* data, std::size_t size);
     void DetachRom();
     std::size_t RomSize() const { return rom_size_; }
+    const std::uint8_t* RomData() const { return rom_; }
+    std::size_t ReadableBytesFrom(std::uint32_t address) const;
+    std::size_t WritableBytesFrom(std::uint32_t address) const;
 
     // The ROM is borrowed; the caller owns its lifetime. No ROM is bundled/copied.
     const std::uint8_t* ResolveRead(std::uint32_t address, std::size_t length) const;
