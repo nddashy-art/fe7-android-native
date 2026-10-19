@@ -46,6 +46,7 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             patched = (include / "gbaio.h").read_text(encoding="utf-8")
             self.assertIn("fe7_gba_io_pointer", patched)
             self.assertIn("fe7_gba_interrupt_vector_slot", patched)
+            self.assertIn("fe7_gba_dma_set((dma_num)", patched)
             video = (include / "gbavideo.h").read_text(encoding="utf-8")
             self.assertIn("FE7_GBA_VRAM_PTR", video)
             self.assertIn("FE7_GBA_PLTT_PTR", video)
@@ -55,7 +56,7 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             self.assertIn("#else\n    u16 * src;", sram_patched)
             self.assertEqual((include / "gbaio.h.fe7native.bak").read_bytes(), original_gbaio)
             self.assertEqual((source / "gbasram.c.fe7native.bak").read_bytes(), original_sram_bytes)
-            self.assertIn("(7 edits)", first.stdout)
+            self.assertIn("(8 edits)", first.stdout)
             self.assertIn("(0 edits)", second.stdout)
             self.assertTrue((include / "gba_port.h").is_file())
 
