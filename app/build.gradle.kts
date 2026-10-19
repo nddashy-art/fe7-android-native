@@ -13,7 +13,8 @@ android {
         minSdk = 23
         targetSdk = 28
         versionCode = 1
-        versionName = "0.1.0-scaffold"
+        versionName = "0.2.0-mgba-preview"
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     externalNativeBuild {
