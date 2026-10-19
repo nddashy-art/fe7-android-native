@@ -210,7 +210,16 @@ Java_org_fe7android_nativeport_MainActivity_nativeRunFrameInto(
     if (g_loaded) retro_run();
     const std::size_t available = static_cast<std::size_t>(capacity) / sizeof(std::uint32_t);
     const std::size_t count = std::min(available, g_frame.size());
-    if (count > 0) std::memcpy(output, g_frame.data(), count * sizeof(std::uint32_t));
+    // Bitmap.copyPixelsFromBuffer consumes RGBA byte order for ARGB_8888
+    // storage on Android. g_frame stores 0xAARRGGBB words, whose in-memory
+    // byte order on little-endian devices is BGRA, so swap red/blue here.
+    // Keep conversion native to avoid per-frame Kotlin allocations.
+    for (std::size_t i = 0; i < count; ++i) {
+        const std::uint32_t pixel = g_frame[i];
+        output[i] = (pixel & 0xFF00FF00u) |
+                    ((pixel & 0x00FF0000u) >> 16) |
+                    ((pixel & 0x000000FFu) << 16);
+    }
     return count == g_frame.size() ? JNI_TRUE : JNI_FALSE;
 }
 
