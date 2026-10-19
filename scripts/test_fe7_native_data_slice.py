@@ -49,6 +49,23 @@ def main() -> int:
             subprocess.run(command, check=True)
             objects.append(obj)
 
+        # Compile more authentic engine services as isolated objects too.
+        # They are not part of the smoke-test shared object until their symbols
+        # and hardware side effects are ported and reviewed.
+        service_objects: list[Path] = []
+        for unit in ("async_upload", "audio", "event", "gbasram", "interrupt"):
+            source = source_dir / f"{unit}.c"
+            obj = output / f"{unit}-service-probe.o"
+            subprocess.run(
+                [
+                    compiler, "-std=gnu11", "-fPIC", "-fno-common",
+                    "-Wall", "-Wextra", "-DFE7_NATIVE_PORT=1",
+                    f"-I{include}", "-c", str(source), "-o", str(obj),
+                ],
+                check=True,
+            )
+            service_objects.append(obj)
+
         # AgbMain is compiled as an object only: the full game entrypoint has
         # unresolved engine services by design and must not be linked yet.
         startup_source = source_dir / "main.c"
@@ -76,7 +93,7 @@ def main() -> int:
 
     print(
         f"FE7 native source smoke test passed: compiled and linked {len(UNITS)} data units "
-        "and compiled src/main.c as an isolated AgbMain object."
+        "compiled 5 service probes, and compiled src/main.c as an isolated AgbMain object."
     )
     return 0
 
