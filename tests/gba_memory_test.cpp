@@ -28,8 +28,15 @@ int main() {
 
     std::array<std::uint8_t, 16> rom{};
     for (std::size_t i = 0; i < rom.size(); ++i) rom[i] = static_cast<std::uint8_t>(i);
+    assert(bus.ReadableBytesFrom(fe7::gba::kEwramBase + 8) == fe7::gba::kEwramSize - 8);
+    assert(bus.WritableBytesFrom(fe7::gba::kVramBase + 16) == fe7::gba::kVramSize - 16);
+    assert(bus.WritableBytesFrom(fe7::gba::kRomBase) == 0);
+    assert(bus.ReadableBytesFrom(0x01000000u) == 0);
+
     assert(bus.AttachRom(rom.data(), rom.size()));
     std::uint8_t byte = 0xFF;
+    assert(bus.ReadableBytesFrom(fe7::gba::kRomBase + 5) == rom.size() - 5);
+    assert(bus.WritableBytesFrom(fe7::gba::kRomBase + 5) == 0);
     assert(bus.Read8(fe7::gba::kRomBase + 5, &byte) && byte == 5);
     assert(bus.Read8(fe7::gba::kRomBase + 18, &byte) && byte == 2);
     assert(!bus.Write8(fe7::gba::kRomBase, 1));
