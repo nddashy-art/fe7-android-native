@@ -186,13 +186,13 @@ extern "C" void RegisterRamReset(std::uint32_t flags) {
 }
 
 extern "C" void SoftReset(std::uint32_t flags) {
-    (void)flags;
+    RegisterRamReset(flags);
     const auto callback = g_soft_reset_callback.load(std::memory_order_acquire);
     if (callback != nullptr) {
         callback();
         return;
     }
-    fe7_gba_reset(0); // preserve EWRAM/save data if no host re-entry callback exists
+    // RAM reset has already occurred; a host callback is needed to re-enter AgbMain.
 }
 extern "C" void VBlankIntrWait(void) {
     const auto callback = g_vblank_callback.load(std::memory_order_acquire);
