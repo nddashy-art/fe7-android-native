@@ -53,3 +53,8 @@ This is strictly a compile probe for the `armeabi-v7a` ABI, not a link/runtime r
 ## Additional authentic C translation-unit probes
 
 The opt-in Android native target also compile-probes `src/async_upload.c`, `src/audio.c`, `src/event.c`, `src/gbasram.c`, and `src/interrupt.c` for the configured Android ABI. These are not linked into the shipped native library yet: the goal is to expose compiler/ABI incompatibilities and begin resolving engine dependencies without leaving unresolved symbols in the app's shared library. `src/m4a.c` remains excluded because its GBA BIOS `swi` instruction is not directly valid for Android userspace, especially ARM64.
+
+
+## Sound-driver source check
+
+The C source `src/m4a.c` compiles to an ARMv7 object in the local Clang test, and the optional Android `armeabi-v7a` source build now compiles it as a standalone probe. It is not linked or executed: its `MusicPlayerJumpTableCopy` function contains `swi 0x2A`, a GBA-side service instruction, and the corresponding original `src/m4a_1.s` uses assembler directives/backend features not yet supported by the Android Clang toolchain. The ARM64 build excludes this object pending an explicit C/platform replacement.
