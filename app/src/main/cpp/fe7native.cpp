@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -194,6 +195,23 @@ extern "C" JNIEXPORT jintArray JNICALL
 Java_org_fe7android_nativeport_MainActivity_nativeRunFrame(JNIEnv* env, jobject) {
     if (g_loaded) retro_run();
     return CopyFrame(env);
+}
+
+/** Run one emulation frame directly into a reusable Java direct buffer.
+ *  This avoids allocating and converting a new jint[] on every frame.
+ */
+extern "C" JNIEXPORT jboolean JNICALL
+Java_org_fe7android_nativeport_MainActivity_nativeRunFrameInto(
+    JNIEnv* env, jobject, jobject output_buffer) {
+    if (output_buffer == nullptr) return JNI_FALSE;
+    auto* output = static_cast<std::uint32_t*>(env->GetDirectBufferAddress(output_buffer));
+    const jlong capacity = env->GetDirectBufferCapacity(output_buffer);
+    if (output == nullptr || capacity < 0) return JNI_FALSE;
+    if (g_loaded) retro_run();
+    const std::size_t available = static_cast<std::size_t>(capacity) / sizeof(std::uint32_t);
+    const std::size_t count = std::min(available, g_frame.size());
+    if (count > 0) std::memcpy(output, g_frame.data(), count * sizeof(std::uint32_t));
+    return count == g_frame.size() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL
