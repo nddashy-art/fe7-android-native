@@ -339,7 +339,7 @@ Java_org_fe7android_nativeport_MainActivity_nativeCreateTestFrame(JNIEnv* env, j
     oam[1] = 90u;   // Attribute 1: X, 8x8 size.
     oam[2] = 0u;    // Attribute 2: tile 0, priority 0, palette bank 0.
 
-    std::vector<std::uint32_t> pixels(fe7::gba::kPpuFramePixels);
+    std::vector<std::uint32_t> pixels(static_cast<std::size_t>(kFrameWidth) * kFrameHeight);
     if (!fe7_gba_render_frame(pixels.data(), pixels.size())) {
         return env->NewIntArray(0);
     }
