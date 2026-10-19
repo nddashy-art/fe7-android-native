@@ -86,6 +86,37 @@ if(FE7_SOURCE_ROOT)
     )
     add_dependencies(fe7native fe7_engine_startup_probe)
 
+    # Additional real C engine/service modules are compiled for every Android
+    # ABI, but held out of the shared-library link until their dependencies are
+    # mapped or replaced. This turns incompatibilities into build-time feedback
+    # without shipping a library with unresolved engine symbols.
+    set(FE7_NATIVE_SERVICE_PROBE_SOURCES
+        "${FE7_SOURCE_ROOT}/src/async_upload.c"
+        "${FE7_SOURCE_ROOT}/src/audio.c"
+        "${FE7_SOURCE_ROOT}/src/event.c"
+        "${FE7_SOURCE_ROOT}/src/gbasram.c"
+        "${FE7_SOURCE_ROOT}/src/interrupt.c"
+    )
+    foreach(FE7_SERVICE_SOURCE IN LISTS FE7_NATIVE_SERVICE_PROBE_SOURCES)
+        if(NOT EXISTS "${FE7_SERVICE_SOURCE}")
+            message(FATAL_ERROR "Required FE7 service source is missing: ${FE7_SERVICE_SOURCE}")
+        endif()
+    endforeach()
+    add_library(fe7_engine_service_probe OBJECT ${FE7_NATIVE_SERVICE_PROBE_SOURCES})
+    set_target_properties(fe7_engine_service_probe PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED YES
+        C_EXTENSIONS YES
+        POSITION_INDEPENDENT_CODE YES
+    )
+    target_compile_definitions(fe7_engine_service_probe PRIVATE FE7_NATIVE_PORT=1)
+    target_compile_options(fe7_engine_service_probe PRIVATE -Wall -Wextra)
+    target_include_directories(fe7_engine_service_probe PRIVATE
+        "${FE7_SOURCE_ROOT}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    add_dependencies(fe7native fe7_engine_service_probe)
+
     # The original assembly is buildable as ARMv7 objects for the 32-bit
     # Android ABI. Keep this as a compile probe for now: the GBA absolute
     # memory layout and ROM-backed data sections prevent linking/execution yet.
@@ -134,7 +165,7 @@ if(FE7_SOURCE_ROOT)
         message(STATUS "FE7 ARMv7 assembly probe enabled: 8 original ASM units compile only; they are not linked or executed.")
     endif()
 
-    message(STATUS "FE7 native source slice enabled: 13 linked data units plus AgbMain compile probe; game boot is not yet implemented.")
+    message(STATUS "FE7 native source slice enabled: 13 linked C units, 5 service compile probes, AgbMain compile probe; game boot is not yet implemented.")
 else()
     message(STATUS "FE7_SOURCE_ROOT not set: building the current Android shell/runtime only.")
 endif()
