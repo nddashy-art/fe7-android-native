@@ -1,6 +1,6 @@
 # FE7 native-port implementation roadmap
 
-The supplied FE7 US decompilation archive has been inventoried and its checksum recorded in `docs/FE7_SOURCE_ARCHIVE_INVENTORY.md`. The repository now has the software GBA runtime foundation and an opt-in Android build path that compiles and links 11 genuine, ROM-independent FE7 C translation units. The actual gameplay engine is still not linked or booted.
+The supplied FE7 US decompilation archive has been inventoried and its checksum recorded in `docs/FE7_SOURCE_ARCHIVE_INVENTORY.md`. The repository now has the software GBA runtime foundation and an opt-in Android build path that compiles and links 13 genuine, ROM-independent FE7 C translation units. The actual gameplay engine is still not linked or booted.
 
 ## Completed milestones
 
@@ -12,7 +12,7 @@ The supplied FE7 US decompilation archive has been inventoried and its checksum 
 
 ## Next engineering sequence
 
-1. Compile the adapted `src/main.c` as an isolated object and iteratively resolve type, memory, and BIOS/service incompatibilities without attempting a full link yet.
+1. Inventory and reduce the full-engine link failures by grouping missing symbols into game functions, ROM-backed data, and GBA hardware services. A cross-link experiment already confirmed that the original assembly carries `R_ARM_ABS32` relocations (including references to game globals and `AgbMain`) that cannot be linked directly into an Android position-independent shared library. This must be fixed before the objects can be executed by Android.
 2. Bring over the smallest startup dependencies in dependency order: key state, SRAM/save compatibility, process manager, sprite system, RNG, and audio initialization. Replace unsupported ARM7TDMI service assembly with tested C equivalents or explicitly isolate the remaining assembly.
 3. Build a testable engine lifecycle that calls `AgbMain` once and then `Fe7EngineRunFrame()` at a deterministic 59.7 Hz cadence; add synthetic tests for initialization failure, one-frame execution and shutdown.
 4. Add GBA timing, VBlank/HBlank, timers and a software 240×160 PPU path. The current memory bus and DMA/IRQ services are incomplete, and direct reads/writes of IO registers are not yet full GBA hardware semantics.
