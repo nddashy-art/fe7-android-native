@@ -82,6 +82,54 @@ void TestAffineBackgroundAndWraparound() {
     assert(frame[Pixel(0, 0)] == 0xFFFF0000u);
 }
 
+void TestBitmapModes345() {
+    fe7::gba::MemoryBus memory;
+    fe7::gba::PpuRenderer ppu(memory);
+    std::array<std::uint32_t, fe7::gba::kPpuFramePixels> frame{};
+
+    // Modes 3-5 use the BG2 affine matrix. Identity leaves the reference at (0,0).
+    Write16(memory, 0x04000020u, 0x0100u);
+    Write16(memory, 0x04000022u, 0u);
+    Write16(memory, 0x04000024u, 0u);
+    Write16(memory, 0x04000026u, 0x0100u);
+    assert(memory.Write32(0x04000028u, 0u));
+    assert(memory.Write32(0x0400002Cu, 0u));
+    Write16(memory, kBg0Control + 4u, 0u);
+    Write16(memory, kPalette + 2u, 0x001Fu); // Red.
+    Write16(memory, kPalette + 4u, 0x03E0u); // Green.
+
+    // Mode 3: 240x160 direct-color framebuffer.
+    Write16(memory, kDisplayControl, 3u | (1u << 10));
+    Write16(memory, kVram, 0x001Fu);
+    Write16(memory, kVram + (159u * 240u + 239u) * 2u, 0x03E0u);
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(0, 0)] == 0xFFFF0000u);
+    assert(frame[Pixel(239, 159)] == 0xFF00FF00u);
+
+    // Mode 4: 240x160 palette-indexed framebuffer, with page select at 0xA000.
+    Write16(memory, kDisplayControl, 4u | (1u << 4) | (1u << 10));
+    assert(memory.Write8(kVram + 0xA000u, 1u));
+    assert(memory.Write8(kVram + 0xA000u + 159u * 240u + 239u, 2u));
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(0, 0)] == 0xFFFF0000u);
+    assert(frame[Pixel(239, 159)] == 0xFF00FF00u);
+
+    // Mode 5: 160x128 direct-color framebuffer. Pixels outside it show backdrop.
+    Write16(memory, kDisplayControl, 5u | (1u << 4) | (1u << 10));
+    Write16(memory, kVram + 0xA000u, 0x03E0u);
+    Write16(memory, kVram + 0xA000u + (127u * 160u + 159u) * 2u, 0x001Fu);
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(0, 0)] == 0xFF00FF00u);
+    assert(frame[Pixel(159, 127)] == 0xFFFF0000u);
+    assert(frame[Pixel(160, 127)] == 0xFF000000u);
+    assert(frame[Pixel(239, 159)] == 0xFF000000u);
+
+    // If BG2 is disabled in a bitmap mode, the framebuffer does not draw.
+    Write16(memory, kDisplayControl, 5u | (1u << 4));
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(0, 0)] == 0xFF000000u);
+}
+
 void TestRegularObjectOverTextBackground() {
     fe7::gba::MemoryBus memory;
     fe7::gba::PpuRenderer ppu(memory);
@@ -160,6 +208,7 @@ void TestRejectsShortOutputBuffer() {
 int main() {
     TestTextBackgroundAndForcedBlank();
     TestAffineBackgroundAndWraparound();
+    TestBitmapModes345();
     TestRegularObjectOverTextBackground();
     TestAffineObjectIdentityAndDoubleSize();
     TestRejectsShortOutputBuffer();
