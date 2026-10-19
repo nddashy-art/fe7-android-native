@@ -247,6 +247,83 @@ class MainActivity : Activity() {
         renderGameFrame()
     }
 
+    private fun startAudioOutput() {
+        stopAudioOutput()
+        val sampleRate = 32768 // mGBA's standard GBA output rate
+        val minBytes = AudioTrack.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_OUT_STEREO,
+            AudioFormat.ENCODING_PCM_16BIT
+        )
+        if (minBytes <= 0) return
+        val track = AudioTrack(
+            AudioManager.STREAM_MUSIC,
+            sampleRate,
+            AudioFormat.CHANNEL_OUT_STEREO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            maxOf(minBytes * 2, 8192),
+            AudioTrack.MODE_STREAM
+        )
+        if (track.state != AudioTrack.STATE_INITIALIZED) {
+            track.release()
+            return
+        }
+        audioTrack = track
+        audioLoopActive = true
+        track.play()
+        audioThread = Thread({
+            val samples = ShortArray(2048 * 2)
+            while (audioLoopActive) {
+                try {
+                    val frames = nativeReadAudio(samples, 2048)
+                    if (frames > 0) {
+                        var offset = 0
+                        val sampleCount = frames * 2
+                        while (offset < sampleCount && audioLoopActive) {
+                            val written = track.write(
+                                samples, offset, sampleCount - offset,
+                                AudioTrack.WRITE_BLOCKING
+                            )
+                            if (written <= 0) break
+                            offset += written
+                        }
+                    } else {
+                        Thread.sleep(2)
+                    }
+                } catch (_: InterruptedException) {
+                    break
+                } catch (_: IllegalStateException) {
+                    break
+                }
+            }
+        }, "FE7-Audio").apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun stopAudioOutput() {
+        audioLoopActive = false
+        audioThread?.interrupt()
+        try {
+            audioThread?.join(150)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+        audioThread = null
+        audioTrack?.let { track ->
+            try {
+                track.pause()
+                track.flush()
+                track.stop()
+            } catch (_: IllegalStateException) {
+                // The track may already have stopped.
+            }
+            track.release()
+        }
+        audioTrack = null
+    }
+
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density + 0.5f).toInt()
 
