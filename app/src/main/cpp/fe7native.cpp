@@ -26,7 +26,7 @@ unsigned g_pixel_format = RETRO_PIXEL_FORMAT_XRGB8888;
 unsigned g_buttons = 0;
 
 // Bounded stereo PCM queue shared by the emulation and Android audio threads.
-constexpr std::size_t kAudioQueueFrames = 32768;
+constexpr std::size_t kAudioQueueFrames = 8192; // 250 ms maximum at 32,768 Hz
 std::int16_t g_audio_queue[kAudioQueueFrames * 2]{};
 std::size_t g_audio_read = 0;
 std::size_t g_audio_write = 0;
@@ -330,11 +330,13 @@ Java_org_fe7android_nativeport_MainActivity_nativeReadAudio(
         static_cast<std::size_t>(max_frames),
         static_cast<std::size_t>(capacity) / 2);
     if (frames == 0) return 0;
-    std::vector<std::int16_t> samples(frames * 2);
-    const std::size_t count = ReadAudio(samples.data(), frames);
+    // Avoid allocating a temporary vector on every audio pull.
+    std::int16_t samples[2048 * 2];
+    const std::size_t safe_frames = std::min(frames, static_cast<std::size_t>(2048));
+    const std::size_t count = ReadAudio(samples, safe_frames);
     if (count > 0) {
         env->SetShortArrayRegion(output_array, 0, static_cast<jsize>(count * 2),
-                                 reinterpret_cast<const jshort*>(samples.data()));
+                                 reinterpret_cast<const jshort*>(samples));
     }
     return static_cast<jint>(count);
 }
