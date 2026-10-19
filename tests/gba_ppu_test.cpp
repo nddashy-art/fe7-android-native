@@ -66,6 +66,11 @@ void TestRegularObjectOverTextBackground() {
     assert(ppu.RenderFrame(frame.data(), frame.size()));
     assert(frame[Pixel(10, 20)] == 0xFF00FF00u);
     assert(frame[Pixel(0, 0)] == 0xFFFF0000u);
+
+    // A priority-1 object sits behind priority-0 background pixels.
+    Write16(memory, kOam + 4u, 1u << 10);
+    assert(ppu.RenderFrame(frame.data(), frame.size()));
+    assert(frame[Pixel(10, 20)] == 0xFFFF0000u);
 }
 
 void TestRejectsShortOutputBuffer() {
