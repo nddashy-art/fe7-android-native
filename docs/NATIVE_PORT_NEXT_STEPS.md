@@ -7,7 +7,8 @@ The supplied FE7 US decompilation archive has been inventoried and its checksum 
 - Software GBA memory bus plus initial BIOS-compatible helpers, DMA and IRQ services, with host tests.
 - Source adapter script that conditionally maps GBA memory/registers, DMA, interrupts, SRAM fast routines and the `AgbMain` loop to the host bridge. The script is regression-tested but does not mean every adapted engine file compiles.
 - Optional `FE7_SOURCE_ROOT` CMake/Gradle wiring for the local FE7 decompilation.
-- First authentic source slice: `util.c`, `text.c`, `face.c`, `unit.c`, `bm.c`, `map.c`, `sprite.c`, `icon.c`, `msg.c`, `debug_text.c`, and `banim_sprite.c` compile/link as a shared native object in the local smoke test and are bundled into `libfe7native.so` when the source root is provided.
+- First authentic source slice: 13 FE7 C translation units compile/link into the native library with the local source root enabled. Five additional service/game translation units (`async_upload.c`, `audio.c`, `event.c`, `gbasram.c`, `interrupt.c`) and `main.c` compile as isolated objects.
+- Eight original ARM assembly units compile as objects for the `armeabi-v7a` ABI only; these assembly objects are not yet linked or executed.
 
 ## Next engineering sequence
 
