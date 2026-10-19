@@ -20,6 +20,7 @@ void fe7_gba_set_soft_reset_callback(void (*callback)(void));
 volatile void* fe7_gba_io_pointer(uint32_t address, size_t length);
 void* fe7_gba_resolve_pointer(uintptr_t address_or_host_pointer,
                               size_t length, int write_access);
+void** fe7_gba_interrupt_vector_slot(void);
 
 // FE7-compatible BIOS service entry points that replace GBA SWI assembly.
 void CpuSet(const void* source, void* destination, uint32_t control);
@@ -41,4 +42,10 @@ void MultiBoot(const void* info);
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifndef FE7_GBA_VRAM_PTR
+#define FE7_GBA_VRAM_PTR ((void*)fe7_gba_resolve_pointer(0x06000000u, 0x18000u, 1))
+#define FE7_GBA_PLTT_PTR ((void*)fe7_gba_resolve_pointer(0x05000000u, 0x400u, 1))
+#define FE7_GBA_OAM_PTR ((void*)fe7_gba_resolve_pointer(0x07000000u, 0x400u, 1))
 #endif
