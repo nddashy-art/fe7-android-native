@@ -205,3 +205,36 @@ extern "C" JNIEXPORT void JNICALL
 Java_org_fe7android_nativeport_MainActivity_nativeStopGame(JNIEnv*, jobject) {
     StopCore();
 }
+
+/** Keep the standalone JNI/video-path diagnostic available beside the real core. */
+extern "C" JNIEXPORT jintArray JNICALL
+Java_org_fe7android_nativeport_MainActivity_nativeCreateTestFrame(JNIEnv* env, jobject) {
+    constexpr int width = 240;
+    constexpr int height = 160;
+    std::vector<jint> pixels(static_cast<std::size_t>(width * height));
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            std::uint32_t color = 0xFF000000u;
+            if (y < 105) {
+                color |= (static_cast<std::uint32_t>(45 + y / 3) << 16) |
+                         (static_cast<std::uint32_t>(105 + y / 5) << 8) |
+                         static_cast<std::uint32_t>(165 + y / 8);
+            } else if (y < 145) {
+                color |= 0xFF3C844Bu;
+            } else {
+                static const std::uint32_t palette[] = {
+                    0xFFDC504Eu, 0xFFF09D49u, 0xFFF5DA62u, 0xFF64BE6Eu,
+                    0xFF4AA6C2u, 0xFF6473DCu, 0xFFA667CCu, 0xFFEDEDE4u,
+                    0xFF373F4Eu, 0xFF121720u
+                };
+                color = palette[std::min((x - (x % 22)) / 22, 9)];
+            }
+            if (x < 2 || x >= width - 2 || y < 2 || y >= height - 2) color = 0xFFFFD98Au;
+            pixels[static_cast<std::size_t>(y * width + x)] = static_cast<jint>(color);
+        }
+    }
+    jintArray result = env->NewIntArray(static_cast<jsize>(pixels.size()));
+    if (result == nullptr) return nullptr;
+    env->SetIntArrayRegion(result, 0, static_cast<jsize>(pixels.size()), pixels.data());
+    return result;
+}
