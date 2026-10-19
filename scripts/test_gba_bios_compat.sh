@@ -55,4 +55,44 @@ COMMON="-std=c++17 -Wall -Wextra -Werror"
   "$ROOT/app/src/main/cpp/fe7_engine_startup.cpp" \
   "$ROOT/tests/fe7_engine_startup_test.cpp" -o "$STARTUP_BIN"
 "$STARTUP_BIN"
+python3 - "$ROOT" <<'PYTEST'
+import importlib.util
+import tempfile
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location(
+    "prepare_fe7_native_source", root / "scripts" / "prepare_fe7_native_source.py"
+)
+assert spec is not None and spec.loader is not None
+adapter = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(adapter)
+source = """void AgbMain(void)
+{
+    InitGame();
+    for (;;)
+    {
+        RunMainFunc();
+        SoftResetIfKeyCombo();
+    }
+}
+
+void PutBuildInfo(u16 * tm)
+{
+}
+"""
+with tempfile.TemporaryDirectory() as tmp:
+    path = Path(tmp) / "main.c"
+    path.write_text(source, encoding="utf-8")
+    assert adapter.wrap_agb_main(path)
+    adapted = path.read_text(encoding="utf-8")
+    assert "void Fe7EngineRunFrame(void)" in adapted
+    assert "    return;" in adapted
+    assert "    RunMainFunc();" in adapted
+    assert path.with_name("main.c.fe7native.bak").is_file()
+    assert not adapter.wrap_agb_main(path)
+    assert path.read_text(encoding="utf-8") == adapted
+print("FE7 AgbMain adapter regression test passed")
+PYTEST
 rm -f "$BIOS_BIN" "$MEMORY_BIN" "$PORT_BIN" "$SERVICES_BIN" "$DMA_BIN" "$IRQ_BIN" "$STARTUP_BIN"
