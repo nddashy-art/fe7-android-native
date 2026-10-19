@@ -27,14 +27,15 @@ constexpr std::size_t kSramSize = 0x10000u;
 // Register side effects, DMA, interrupts, timing and PPU behavior are separate layers.
 class MemoryBus final {
 public:
-    MemoryBus() = default;
+    MemoryBus();
     bool AttachRom(const std::uint8_t* data, std::size_t size);
     void DetachRom();
     std::size_t RomSize() const { return rom_size_; }
 
-    // The ROM is borrowed; the caller owns its lifetime. No ROM is bundled or copied.
+    // The ROM is borrowed; the caller owns its lifetime. No ROM is bundled/copied.
     const std::uint8_t* ResolveRead(std::uint32_t address, std::size_t length) const;
     std::uint8_t* ResolveWrite(std::uint32_t address, std::size_t length);
+    volatile void* ResolveIoRegister(std::uint32_t address, std::size_t length);
 
     bool Read8(std::uint32_t address, std::uint8_t* out) const;
     bool Read16(std::uint32_t address, std::uint16_t* out) const;
@@ -57,7 +58,7 @@ private:
 
     std::array<std::uint8_t, kEwramSize> ewram_{};
     std::array<std::uint8_t, kIwramSize> iwram_{};
-    std::array<std::uint8_t, kIoSize> io_{};
+    alignas(8) std::array<std::uint8_t, kIoSize> io_{};
     std::array<std::uint8_t, kPaletteSize> palette_{};
     std::array<std::uint8_t, kVramSize> vram_{};
     std::array<std::uint8_t, kOamSize> oam_{};
