@@ -1,0 +1,38 @@
+name: Native GBA runtime smoke tests
+
+on:
+  push:
+    branches:
+      - native-runtime-integration
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-runtime-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure runtime without mGBA or Android SDK
+        run: |
+          cmake -S app/src/main/cpp -B build/native-runtime -G Ninja \
+            -DFE7_BUILD_ANDROID_FRONTEND=OFF \
+            -DBUILD_TESTING=ON
+
+      - name: Build native runtime
+        run: cmake --build build/native-runtime --parallel 2
+
+      - name: Run native runtime smoke tests
+        run: ctest --test-dir build/native-runtime --output-on-failure
