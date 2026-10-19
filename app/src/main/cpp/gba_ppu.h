@@ -34,6 +34,10 @@ private:
     bool RenderAffineBackgroundPixel(unsigned bg, unsigned x, unsigned y,
                                      std::uint32_t* color,
                                      std::uint16_t* rank) const;
+    bool RenderBitmapBackgroundPixel(unsigned mode, unsigned x, unsigned y,
+                                     std::uint16_t display_control,
+                                     std::uint32_t* color,
+                                     std::uint16_t* rank) const;
     void RenderObjects();
     void RenderObject(unsigned oam_index);
     void RenderAffineObject(unsigned oam_index);
