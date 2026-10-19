@@ -37,6 +37,9 @@ jobs:
         with:
           packages: platforms;android-35 build-tools;35.0.0 cmake;3.22.1 ndk;27.2.12479018
 
+      - name: Build pinned mGBA core for Android ABIs
+        run: bash tools/build_mgba_android.sh
+
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
 
