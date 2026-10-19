@@ -18,15 +18,15 @@ Keep your own source archive out of Git. Extract it somewhere local, then prefer
 ```sh
 unzip fe7_us-main.zip -d /tmp/fe7-source
 cp -a /tmp/fe7-source/fe7_us-main /tmp/fe7-us-native
-python3 scripts/test_fe7_native_data_slice.py /tmp/fe7-us-native
 python3 scripts/prepare_fe7_native_source.py /tmp/fe7-us-native
+python3 scripts/test_fe7_native_data_slice.py /tmp/fe7-us-native
 ./gradlew assembleDebug -Pfe7SourceRoot=/tmp/fe7-us-native
 ```
 
-Use an absolute path for `fe7SourceRoot`. The smoke-test script compiles the same 11 C files with the host compiler and verifies they can be linked into a shared object. Android CMake then compiles them with the NDK and adds their objects to the APK's native library.
+Use an absolute path for `fe7SourceRoot`. The smoke-test script compiles the 11 data-only C files with the host compiler, verifies they link into a shared object, and separately compiles adapted `src/main.c` to an object. Android CMake repeats these steps with the NDK, adds the data objects to the APK's native library, and keeps the startup object out of the link until its dependencies are ported.
 
 ## What this milestone proves — and does not prove
 
-It proves a reproducible route for building a real, ROM-independent slice of FE7's own C source and packaging it with the Android native library. It does **not** call `AgbMain`, link the full event/game logic or ARM7TDMI assembly, render the GBA PPU, run game audio, or reach the title screen. The app's current play path remains mGBA/libretro until the complete engine and its platform dependencies are ported and verified.
+It proves a reproducible route for building a real, ROM-independent slice of FE7's own C source and packaging it with the Android native library. It does **not** link or call `AgbMain`, link the full event/game logic or ARM7TDMI assembly, render the GBA PPU, run game audio, or reach the title screen. Compiling `main.c` alone proves source-level compatibility for that translation unit only. The app's current play path remains mGBA/libretro until the complete engine and its platform dependencies are ported and verified.
 
 Next work: compile the adapted startup translation unit, resolve its BIOS/service dependencies, and build a deterministic VBlank/frame scheduler before wiring it into Android's render loop. Never package a ROM or proprietary game assets in CI.
