@@ -36,6 +36,11 @@ class MainActivity : Activity() {
     private var gameBitmap: Bitmap? = null
     private var gameImage: ImageView? = null
     private var gameLoopActive = false
+    // GBA timing is about 59.7275 frames/s (16.7427 ms/frame), not 16 ms.
+    // Keep emulation paced to the core's expected rate so audio samples are not
+    // generated faster than AudioTrack consumes them (which can distort music).
+    private var nextFrameTimeNanos = 0L
+    private val frameDurationNanos = 1_000_000_000L / 59.7275
     @Volatile private var audioLoopActive = false
     private var audioTrack: AudioTrack? = null
     private var audioThread: Thread? = null
@@ -177,6 +182,7 @@ class MainActivity : Activity() {
         currentPressedButtons = 0
         nativeSetButtons(0)
         gameLoopActive = true
+        nextFrameTimeNanos = System.nanoTime()
         startAudioOutput()
 
         // Fullscreen landscape; touch controls float over the image edges.
@@ -377,7 +383,16 @@ class MainActivity : Activity() {
             gameLoopActive = false
             return
         }
-        frameHandler.postDelayed({ renderGameFrame() }, 16L)
+        nextFrameTimeNanos += frameDurationNanos.toLong()
+        val now = System.nanoTime()
+        // If Android was paused/busy, avoid a burst of catch-up frames that
+        // would flood the bounded audio queue and discard music samples.
+        if (now - nextFrameTimeNanos > frameDurationNanos.toLong() * 2L) {
+            nextFrameTimeNanos = now
+        }
+        val delayMs = ((nextFrameTimeNanos - System.nanoTime()) / 1_000_000L)
+            .coerceAtLeast(1L)
+        frameHandler.postDelayed({ renderGameFrame() }, delayMs)
     }
 
     private fun showNativeVideoTest() {
