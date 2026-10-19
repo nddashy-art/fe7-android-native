@@ -60,7 +60,11 @@ class MainActivity : Activity() {
         showLauncher()
     }
 
-    private fun showLauncher() {\n        gameLoopActive = false\n        frameHandler.removeCallbacksAndMessages(null)\n\n        val root = LinearLayout(this).apply {
+    private fun showLauncher() {
+        gameLoopActive = false
+        frameHandler.removeCallbacksAndMessages(null)
+
+        val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(28, 24, 28, 24)
@@ -87,7 +91,12 @@ class MainActivity : Activity() {
             setOnClickListener { openRomPicker() }
         }
 
-        val startGameButton = Button(this).apply {\n            text = "Iniciar FE7 (motor mGBA)"\n            setOnClickListener { startSelectedGame() }\n        }\n\n        val videoTestButton = Button(this).apply {
+        val startGameButton = Button(this).apply {
+            text = "Iniciar FE7 (motor mGBA)"
+            setOnClickListener { startSelectedGame() }
+        }
+
+        val videoTestButton = Button(this).apply {
             text = "Probar pantalla nativa"
             setOnClickListener { showNativeVideoTest() }
         }
@@ -110,6 +119,7 @@ class MainActivity : Activity() {
         root.addView(title, layoutParams(bottom = 22))
         root.addView(description, layoutParams(bottom = 18))
         root.addView(chooseButton, layoutParams(bottom = 8))
+        root.addView(startGameButton, layoutParams(bottom = 8))
         root.addView(videoTestButton, layoutParams(bottom = 8))
         root.addView(romStatus, layoutParams(bottom = 18))
         root.addView(warning, layoutParams())
