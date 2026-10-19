@@ -31,17 +31,16 @@ def wrap_dma_macro(path: Path) -> bool:
     for start, line in enumerate(lines):
         if line.startswith("#define DmaSet(dma_num, src, dst, control)"):
             end = start
-            while lines[end].rstrip("\\r\\n").rstrip().endswith("\\\\"):
+            while lines[end].rstrip().endswith(chr(92)):
                 end += 1
                 if end >= len(lines):
                     raise RuntimeError(f"unterminated DmaSet macro in {path}")
             original = "".join(lines[start:end + 1])
             replacement = (
-                "#ifdef FE7_NATIVE_PORT\\n"
-                "#define DmaSet(dma_num, src, dst, control) \\\\n"
-                "    fe7_gba_dma_set((dma_num), (const void *)(src), (void *)(dst), (u32)(control))\\n"
-                "#else\\n" + original +
-                "#endif // FE7_NATIVE_PORT\\n"
+                "#ifdef FE7_NATIVE_PORT\n"
+                "#define DmaSet(dma_num, src, dst, control) fe7_gba_dma_set((dma_num), (const void *)(src), (void *)(dst), (u32)(control))\n"
+                "#else\n" + original +
+                "#endif // FE7_NATIVE_PORT\n"
             )
             updated = "".join(lines[:start]) + replacement + "".join(lines[end + 1:])
             backup = path.with_name(path.name + ".fe7native.bak")
