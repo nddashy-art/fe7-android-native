@@ -28,3 +28,10 @@ This remains a partial BIOS layer: Huffman/RL decoding, the full IRQ/timer/DMA m
 ## Software DMA bridge (initial)
 
 Under `FE7_NATIVE_PORT`, the source adapter replaces the `DmaSet` register-write macro with `fe7_gba_dma_set`. That preserves the callsites (`DmaCopy16/32`, `DmaFill16/32`, etc.) while making immediate DMA perform a bounded software copy/fill through the virtual memory bus. The module also stores VBlank- and HBlank-triggered channel state and exposes `fe7_gba_dma_on_vblank` and `fe7_gba_dma_on_hblank` for the runtime/renderer. `VBlankIntrWait` invokes the VBlank DMA hook; HBlank DMA still requires the not-yet-integrated per-scanline renderer to call its hook. Audio/FIFO special DMA, channel-specific zero-count transfer lengths, DMA IRQ signaling, and exact I/O register readback remain unimplemented.
+
+
+## Native interrupt controller (initial)
+
+The port layer now has a software IRQ dispatcher with GBA IE/IF/IME masks, 14 callback slots, write-one-to-clear behavior for pending flags, and host replacements for IntrWait/Halt/Stop. VBlank wait advances deferred VBlank DMA and raises IRQ bit 0. The source adapter conditionally replaces src/interrupt.c's ARM7TDMI IntrMain copy path with a C dispatcher and native callback table.
+
+This is an integration foundation, not a complete timing model: timers are not advanced, HBlank IRQ/DMA is not driven by a scanline renderer yet, DMA IRQ flags are not raised, and other functions in src/crt0.s and src/gbasvc.s remain assembly dependencies. The app currently has no call site that starts AgbMain.
