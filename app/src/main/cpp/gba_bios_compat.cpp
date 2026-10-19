@@ -34,13 +34,11 @@ bool CpuSet(const void* source, void* destination, std::uint32_t control) {
 }
 
 bool CpuFastSet(const void* source, void* destination, std::uint32_t control) {
-    // CpuFastSet transfers 32-bit words in groups of eight; the word count is
-    // rounded up to the next multiple of eight as on the GBA BIOS.
+    // Project Picori's BIOS compatibility layer and FE7's control word both
+    // treat the low 21 bits as an exact count of 32-bit words.
     const std::size_t words = control & kTransferCountMask;
-    if (words > std::numeric_limits<std::size_t>::max() - 7u) return false;
-    const std::size_t rounded_words = (words + 7u) & ~std::size_t(7u);
     std::size_t bytes = 0;
-    if (!CheckedBytes(rounded_words, sizeof(std::uint32_t), &bytes) ||
+    if (!CheckedBytes(words, sizeof(std::uint32_t), &bytes) ||
         !HasBuffers(source, destination, bytes)) return false;
     if (bytes == 0) return true;
 
