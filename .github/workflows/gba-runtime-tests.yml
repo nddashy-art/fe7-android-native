@@ -1,0 +1,20 @@
+name: GBA runtime host tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable-runtime-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Show compiler
+        run: c++ --version
+      - name: Run portable GBA runtime tests
+        run: sh scripts/test_gba_bios_compat.sh
