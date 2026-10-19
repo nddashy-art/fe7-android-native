@@ -9,9 +9,9 @@ constexpr std::uint32_t kDisplayControl = 0x04000000u;
 constexpr std::uint32_t kBgControlBase = 0x04000008u;
 constexpr std::uint32_t kBgHofsBase = 0x04000010u;
 constexpr std::uint32_t kBgVofsBase = 0x04000012u;
-constexpr std::uint32_t kPaletteBase = 0x05000000u;
-constexpr std::uint32_t kVramBase = 0x06000000u;
-constexpr std::uint32_t kOamBase = 0x07000000u;
+constexpr std::uint32_t kPpuPaletteBase = 0x05000000u;
+constexpr std::uint32_t kPpuVramBase = 0x06000000u;
+constexpr std::uint32_t kPpuOamBase = 0x07000000u;
 constexpr std::uint16_t kForcedBlank = 1u << 7;
 constexpr std::uint16_t kObjOneDimensional = 1u << 6;
 constexpr std::uint16_t kBgEnableBase = 1u << 8;
@@ -54,7 +54,7 @@ std::uint32_t PpuRenderer::ConvertBgr555(std::uint16_t color) {
 std::uint32_t PpuRenderer::ReadPaletteColor(unsigned palette_index) const {
     std::uint16_t bgr555 = 0;
     if (palette_index >= 512 ||
-        !Read16(memory_, kPaletteBase + palette_index * 2u, &bgr555)) {
+        !Read16(memory_, kPpuPaletteBase + palette_index * 2u, &bgr555)) {
         return 0xFF000000u;
     }
     return ConvertBgr555(bgr555);
@@ -81,7 +81,7 @@ bool PpuRenderer::ReadTextTilePixel(unsigned, std::uint16_t control,
     const unsigned block_x = tile_x / 32u;
     const unsigned block_y = tile_y / 32u;
     const unsigned screen_block = block_y * blocks_wide + block_x;
-    const std::uint32_t map_address = kVramBase + screen_base * 0x800u +
+    const std::uint32_t map_address = kPpuVramBase + screen_base * 0x800u +
         screen_block * 0x800u + ((tile_y & 31u) * 32u + (tile_x & 31u)) * 2u;
 
     std::uint16_t entry = 0;
@@ -92,11 +92,11 @@ bool PpuRenderer::ReadTextTilePixel(unsigned, std::uint16_t control,
     if ((entry & (1u << 11)) != 0) pixel_y = 7u - pixel_y;
 
     const unsigned tile_number = entry & 0x3FFu;
-    const std::uint32_t tile_address = kVramBase + char_base * 0x4000u +
+    const std::uint32_t tile_address = kPpuVramBase + char_base * 0x4000u +
         tile_number * tile_size + (color256 ? pixel_y * 8u + pixel_x
                                             : pixel_y * 4u + pixel_x / 2u);
     // BG character data occupies the first 64 KiB of VRAM; OBJ data starts at 0x10000.
-    if (tile_address < kVramBase || tile_address >= kVramBase + 0x10000u) return false;
+    if (tile_address < kPpuVramBase || tile_address >= kPpuVramBase + 0x10000u) return false;
 
     std::uint8_t value = 0;
     if (!memory_.Read8(tile_address, &value)) return false;
@@ -139,7 +139,7 @@ void PpuRenderer::RenderObject(unsigned oam_index) {
     const bool one_dimensional = (display_control & kObjOneDimensional) != 0;
 
     std::uint16_t attr0 = 0, attr1 = 0, attr2 = 0;
-    const std::uint32_t entry = kOamBase + oam_index * 8u;
+    const std::uint32_t entry = kPpuOamBase + oam_index * 8u;
     if (!Read16(memory_, entry, &attr0) ||
         !Read16(memory_, entry + 2u, &attr1) ||
         !Read16(memory_, entry + 4u, &attr2)) return;
@@ -185,10 +185,10 @@ void PpuRenderer::RenderObject(unsigned oam_index) {
             const unsigned tile_offset = one_dimensional
                 ? (tile_y * tiles_wide + tile_x) * tile_bytes
                 : tile_y * 0x400u + tile_x * tile_bytes;
-            const std::uint32_t tile_address = kVramBase + 0x10000u +
+            const std::uint32_t tile_address = kPpuVramBase + 0x10000u +
                 tile_base * 32u + tile_offset;
-            if (tile_address < kVramBase + 0x10000u ||
-                tile_address >= kVramBase + 0x18000u) continue;
+            if (tile_address < kPpuVramBase + 0x10000u ||
+                tile_address >= kPpuVramBase + 0x18000u) continue;
 
             const unsigned within_x = source_x & 7u;
             const unsigned within_y = source_y & 7u;
