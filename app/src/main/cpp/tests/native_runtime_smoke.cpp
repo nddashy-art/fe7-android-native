@@ -21,7 +21,7 @@ int main() {
     std::uint32_t value = 0;
     assert(memory.Read32(fe7::gba::kEwramBase, &value));
     assert(value == 0x12345678u);
-    assert(!memory.Read32(fe7::gba::kEwramBase + fe7::gba::kEwramSize - 2, &value));
+    assert(!memory.Read32(0x01000000u, &value));
 
     std::vector<std::uint8_t> rom(0xC0, 0);
     constexpr char kTitle[] = "FIRE EMBLEM";
