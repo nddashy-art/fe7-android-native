@@ -92,7 +92,7 @@ def main() -> int:
             return 1
 
     print(
-        f"FE7 native source smoke test passed: compiled and linked {len(UNITS)} data units "
+        f"FE7 native source-slice smoke test passed: linked {len(UNITS)} low-dependency units, "
         "compiled 5 service probes, and compiled src/main.c as an isolated AgbMain object."
     )
     return 0
