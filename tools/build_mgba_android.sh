@@ -14,7 +14,7 @@ if [[ ! -d "$NDK" ]]; then
   exit 1
 fi
 
-for ABI in arm64-v8a armeabi-v7a x86; do
+for ABI in arm64-v8a armeabi-v7a; do
   BUILD_DIR="${RUNNER_TEMP:-/tmp}/mgba-build-$ABI"
   cmake -S "$MGBA_DIR" -B "$BUILD_DIR" \
     -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
