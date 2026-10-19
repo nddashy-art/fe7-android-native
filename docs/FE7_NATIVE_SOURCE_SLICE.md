@@ -1,15 +1,15 @@
 # FE7 native-source slice — milestone 1
 
-This adds the first build path that compiles and links translation units from the supplied FE7 decompilation into the Android native library. It is intentionally small and does **not** imply that the game engine boots yet.
+This adds the first build path that compiles and links low-dependency translation units from the supplied FE7 decompilation into the Android native library. It is intentionally small and does **not** imply that the game engine boots yet.
 
 ## Included source units
 
-The optional `fe7_engine_data` object target builds these original source files from a local `fe7_us-main` tree:
+The optional `fe7_engine_seed` object target builds these original source files from a local `fe7_us-main` tree:
 
 - `util.c`, `text.c`, `face.c`, `hardware.c`, `proc.c`, `unit.c`, `bm.c`, `map.c`
 - `sprite.c`, `icon.c`, `msg.c`, `debug_text.c`, `banim_sprite.c`
 
-They define engine-facing global state and data tables; none needs a baserom to compile. The object files are linked into `libfe7native.so`, rather than merely being syntax-checked in a disconnected project.
+They include helper logic and global state/tables; none requires the baserom just to compile. The object files are linked into `libfe7native.so`, rather than merely being syntax-checked in a disconnected project.
 
 ## Build from a local source copy
 
@@ -23,7 +23,7 @@ python3 scripts/test_fe7_native_data_slice.py /tmp/fe7-us-native
 ./gradlew assembleDebug -Pfe7SourceRoot=/tmp/fe7-us-native
 ```
 
-Use an absolute path for `fe7SourceRoot`. The smoke-test script compiles the 13 data-only C files with the host compiler, verifies they link into a shared object, and separately compiles adapted `src/main.c` to an object. Android CMake repeats these steps with the NDK, adds the data objects to the APK's native library, and keeps the startup object out of the link until its dependencies are ported.
+Use an absolute path for `fe7SourceRoot`. The smoke-test script compiles the 13 low-dependency C files with the host compiler, verifies they link into a shared object, and separately compiles adapted `src/main.c` to an object. Android CMake repeats these steps with the NDK, adds the data objects to the APK's native library, and keeps the startup object out of the link until its dependencies are ported.
 
 For every ABI, CMake also compiles five additional FE7 service/game translation units as object-only probes: `async_upload.c`, `audio.c`, `event.c`, `gbasram.c`, and `interrupt.c`. They are intentionally not linked yet because unresolved dependencies and hardware effects need to be mapped first.
 
