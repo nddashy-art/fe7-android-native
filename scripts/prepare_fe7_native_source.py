@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""Apply the first FE7-to-native memory-header adapter.
+"""Safely apply the first FE7-to-native memory/BIOS compatibility layer.
 
 Usage: python3 scripts/prepare_fe7_native_source.py /path/to/fe7_us-main
-Keeps .fe7native.bak copies and is idempotent. This changes register/pointer
-macros only; it does not port ARM7TDMI assembly or build the game engine.
+It keeps .fe7native.bak copies and is idempotent. It does not port the GBA
+assembly or claim that the whole engine is ready to link or run.
 """
 from __future__ import annotations
-
 import argparse
 import shutil
 import sys
 from pathlib import Path
-
 
 def replace_once(path: Path, old: str, new: str) -> bool:
     source = path.read_text(encoding="utf-8")
@@ -25,14 +23,13 @@ def replace_once(path: Path, old: str, new: str) -> bool:
     path.write_text(source.replace(old, new, 1), encoding="utf-8")
     return True
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source_root", type=Path, help="extracted FE7 decompilation root")
     args = parser.parse_args()
     root = args.source_root.resolve()
     inc = root / "include"
-    targets = [inc / "gbaio.h", inc / "gbavideo.h", inc / "hardware.h"]
+    targets = [inc / "gbaio.h", inc / "gbavideo.h", inc / "hardware.h", root / "src" / "gbasram.c"]
     missing = [str(path) for path in targets if not path.is_file()]
     if missing:
         parser.error("source root is missing expected files: " + ", ".join(missing))
@@ -61,8 +58,7 @@ def main() -> int:
 #define REG(type, addr) (*((volatile type *)fe7_gba_io_pointer((uint32_t)(addr), sizeof(type))))
 #else
 #define REG(type, addr) (*((type volatile *)(addr)))
-#endif''',
-    )
+#endif''')
     changed += replace_once(
         inc / "gbaio.h",
         '#define INTR_VECTOR (*(void **)0x03007FFC)',
@@ -70,8 +66,7 @@ def main() -> int:
 #define INTR_VECTOR (*fe7_gba_interrupt_vector_slot())
 #else
 #define INTR_VECTOR (*(void **)0x03007FFC)
-#endif''',
-    )
+#endif''')
     changed += replace_once(
         inc / "gbavideo.h",
         '#include "prelude.h"\n\n#define VRAM_ADDR 0x06000000\n#define VRAM_SIZE 0x18000\n#define VRAM ((void *)VRAM_ADDR)\n\n#define PLTT_ADDR 0x05000000\n#define PLTT_SIZE 0x400\n#define PLTT ((void *)PLTT_ADDR)\n\n#define OAM_ADDR 0x07000000\n#define OAM_SIZE 0x400\n#define OAM ((void *)OAM_ADDR)',
@@ -102,8 +97,7 @@ def main() -> int:
 #define OAM FE7_GBA_OAM_PTR
 #else
 #define OAM ((void *)OAM_ADDR)
-#endif''',
-    )
+#endif''')
     changed += replace_once(
         inc / "hardware.h",
         '#include "prelude.h"\n\n// TODO: move to gbasomething\n#define VRAM (void *)0x06000000',
@@ -117,13 +111,40 @@ def main() -> int:
 #define VRAM FE7_GBA_VRAM_PTR
 #else
 #define VRAM (void *)0x06000000
-#endif''',
-    )
+#endif''')
+    sram_source = root / "src" / "gbasram.c"
+    changed += replace_once(
+        sram_source,
+        "u32 (*COMMON(VerifySramFast) VerifySramFast)(void const * src, void * dst, u32 size) = NULL;",
+        """#ifdef FE7_NATIVE_PORT
+uptr (*COMMON(VerifySramFast) VerifySramFast)(void const * src, void * dst, u32 size) = NULL;
+#else
+u32 (*COMMON(VerifySramFast) VerifySramFast)(void const * src, void * dst, u32 size) = NULL;
+#endif""")
+    changed += replace_once(
+        sram_source,
+        "void SetSramFastFunc(void)\n{\n    u16 * src;",
+        """void SetSramFastFunc(void)
+{
+#ifdef FE7_NATIVE_PORT
+    // ARM7TDMI machine-code blobs copied into writable/executable RAM cannot be
+    // called on Android; native builds use the equivalent C implementations.
+    ReadSramFast = (void (*)(void const *, void *, u32))ReadSramFastRom;
+    VerifySramFast = (uptr (*)(void const *, void *, u32))VerifySramFastRom;
+#else
+    u16 * src;""")
+    changed += replace_once(
+        sram_source,
+        "    VerifySramFast = (void *)((uptr)VerifySramFastBuf + 1);\n\n    REG_WAITCNT = (REG_WAITCNT & ~3) | 3;\n}",
+        """    VerifySramFast = (void *)((uptr)VerifySramFastBuf + 1);
+
+    REG_WAITCNT = (REG_WAITCNT & ~3) | 3;
+#endif
+}""")
     print(f"Native memory-header adapter applied to {root} ({changed} edits).")
-    print("Backups use the .fe7native.bak suffix. This is not a game-engine build or a ROM boot test.")
+    print("Backups use the .fe7native.bak suffix. This is not a game-engine build or ROM boot test.")
     print("Compile with FE7_NATIVE_PORT defined and include app/src/main/cpp for the native API.")
     return 0
-
 
 if __name__ == "__main__":
     try:
