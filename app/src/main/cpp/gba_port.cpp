@@ -2,12 +2,14 @@
 
 #include "gba_bios_compat.h"
 #include "gba_memory.h"
+#include "gba_ppu.h"
 
 #include <cstdint>
 #include <limits>
 
 namespace {
 fe7::gba::MemoryBus g_memory;
+fe7::gba::PpuRenderer g_ppu(g_memory);
 void* g_interrupt_vector = nullptr;
 
 void* ResolveLegacyPointer(const void* pointer, std::size_t length, bool write_access) {
@@ -75,6 +77,9 @@ extern "C" int fe7_gba_attach_rom(const uint8_t* data, size_t size) {
 }
 extern "C" void fe7_gba_detach_rom(void) { g_memory.DetachRom(); }
 extern "C" void fe7_gba_reset(int clear_ewram) { g_memory.Reset(clear_ewram != 0); }
+extern "C" int fe7_gba_render_frame(uint32_t* output_rgba, size_t pixel_count) {
+    return g_ppu.RenderFrame(output_rgba, pixel_count) ? 1 : 0;
+}
 extern "C" void** fe7_gba_interrupt_vector_slot(void) { return &g_interrupt_vector; }
 extern "C" volatile void* fe7_gba_io_pointer(uint32_t address, size_t length) {
     return g_memory.ResolveIoRegister(address, length);
