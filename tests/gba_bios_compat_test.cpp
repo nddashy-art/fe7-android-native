@@ -20,7 +20,12 @@ int main() {
 
     destination.fill(0);
     assert(CpuFastSet(source.data(), destination.data(), 9u));
-    for (std::size_t i = 0; i < 16; ++i) assert(destination[i] == source[i]);
+    for (std::size_t i = 0; i < 9; ++i) assert(destination[i] == source[i]);
+    for (std::size_t i = 9; i < 16; ++i) assert(destination[i] == 0);
+
+    destination.fill(0);
+    assert(CpuFastSet(source.data(), destination.data(), 3u | kSourceFixed));
+    for (std::size_t i = 0; i < 3; ++i) assert(destination[i] == source[0]);
 
     const std::uint8_t packed[] = {0x10, 3, 0, 0, 0x00, 'A', 'B', 'C'};
     std::array<std::uint8_t, 3> decoded{};
