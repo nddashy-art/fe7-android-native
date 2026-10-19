@@ -12,11 +12,14 @@ fe7::gba::MemoryBus g_memory;
 void* ResolveLegacyPointer(const void* pointer, std::size_t length, bool write_access) {
     if (pointer == nullptr) return nullptr;
     const std::uintptr_t value = reinterpret_cast<std::uintptr_t>(pointer);
+    // FE7's original ARM build passes bus addresses as pointers. On a native
+    // host those values are not dereferenceable; translate them to backing RAM.
     if (value >= 0x02000000u && value < 0x0F000000u) {
         if (write_access)
             return g_memory.ResolveWrite(static_cast<std::uint32_t>(value), length);
         return const_cast<std::uint8_t*>(g_memory.ResolveRead(static_cast<std::uint32_t>(value), length));
     }
+    // Stack/heap pointers in a native build already point at host memory.
     return const_cast<void*>(pointer);
 }
 
@@ -49,7 +52,8 @@ extern "C" void CpuSet(const void* source, void* destination, uint32_t control) 
     const std::size_t unit = (control & fe7::bios::kTransfer32Bit) ? 4u : 2u;
     std::size_t bytes = 0;
     if (!CopySize(control, unit, &bytes)) return;
-    const void* resolved_source = ResolveLegacyPointer(source, bytes, false);
+    const std::size_t source_bytes = (control & fe7::bios::kSourceFixed) ? unit : bytes;
+    const void* resolved_source = ResolveLegacyPointer(source, source_bytes, false);
     void* resolved_destination = ResolveLegacyPointer(destination, bytes, true);
     if (bytes != 0 && (resolved_source == nullptr || resolved_destination == nullptr)) return;
     (void)fe7::bios::CpuSet(resolved_source, resolved_destination, control);
@@ -58,7 +62,8 @@ extern "C" void CpuSet(const void* source, void* destination, uint32_t control) 
 extern "C" void CpuFastSet(const void* source, void* destination, uint32_t control) {
     std::size_t bytes = 0;
     if (!CopySize(control, sizeof(std::uint32_t), &bytes)) return;
-    const void* resolved_source = ResolveLegacyPointer(source, bytes, false);
+    const std::size_t source_bytes = (control & fe7::bios::kSourceFixed) ? sizeof(std::uint32_t) : bytes;
+    const void* resolved_source = ResolveLegacyPointer(source, source_bytes, false);
     void* resolved_destination = ResolveLegacyPointer(destination, bytes, true);
     if (bytes != 0 && (resolved_source == nullptr || resolved_destination == nullptr)) return;
     (void)fe7::bios::CpuFastSet(resolved_source, resolved_destination, control);
