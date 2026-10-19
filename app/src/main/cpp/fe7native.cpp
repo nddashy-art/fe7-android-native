@@ -1,5 +1,6 @@
 #include <jni.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -45,4 +46,73 @@ Java_org_fe7android_nativeport_MainActivity_nativeInspectGbaHeader(
         (header.looks_like_fire_emblem ? "1" : "0");
 
     return env->NewStringUTF(result.c_str());
+}
+
+namespace {
+constexpr int kTestFrameWidth = 240;
+constexpr int kTestFrameHeight = 160;
+
+jint TestArgb(int red, int green, int blue) {
+    return static_cast<jint>(0xFF000000u |
+        (static_cast<std::uint32_t>(red & 0xFF) << 16) |
+        (static_cast<std::uint32_t>(green & 0xFF) << 8) |
+        static_cast<std::uint32_t>(blue & 0xFF));
+}
+
+bool TestCircle(int x, int y, int cx, int cy, int radius) {
+    const int dx = x - cx;
+    const int dy = y - cy;
+    return dx * dx + dy * dy <= radius * radius;
+}
+}  // namespace
+
+/** Diagnostic-only image. This is not output from the FE7 game engine. */
+extern "C" JNIEXPORT jintArray JNICALL
+Java_org_fe7android_nativeport_MainActivity_nativeCreateTestFrame(
+    JNIEnv* env, jobject /* thiz */) {
+    constexpr int count = kTestFrameWidth * kTestFrameHeight;
+    std::vector<jint> pixels(static_cast<std::size_t>(count));
+    static const int swatches[][3] = {
+        {220, 80, 78}, {240, 157, 73}, {245, 218, 98},
+        {100, 190, 110}, {74, 166, 194}, {100, 115, 220},
+        {166, 103, 204}, {237, 237, 228}, {55, 63, 78}, {18, 23, 32}
+    };
+
+    for (int y = 0; y < kTestFrameHeight; ++y) {
+        for (int x = 0; x < kTestFrameWidth; ++x) {
+            jint color = TestArgb(55 + y / 3, 115 + y / 4, 180 + y / 8);
+            if ((TestCircle(x, y, 42, 28, 10) ||
+                 TestCircle(x, y, 53, 25, 12) ||
+                 TestCircle(x, y, 64, 29, 9)) && y < 45) {
+                color = TestArgb(239, 244, 238);
+            }
+            if (TestCircle(x, y, 195, 29, 13)) color = TestArgb(255, 218, 111);
+
+            const int ridgeLeft = 108 - std::abs(x - 66) * 3 / 2;
+            const int ridgeRight = 119 - std::abs(x - 154) * 5 / 4;
+            if ((y >= ridgeLeft && y < 112) || (y >= ridgeRight && y < 125)) {
+                color = TestArgb(72, 105, 124);
+            }
+            if (y >= 111) color = TestArgb(60, 132, 75);
+            if (y >= 127 && (x + y) % 17 < 3) color = TestArgb(105, 171, 83);
+
+            if (x < 2 || x >= kTestFrameWidth - 2 || y < 2 || y >= kTestFrameHeight - 2) {
+                color = TestArgb(255, 217, 138);
+            }
+            if (y >= 145 && y < 158 && x >= 10 && x < 230) {
+                const int index = std::min((x - 10) / 22, 9);
+                color = TestArgb(swatches[index][0], swatches[index][1], swatches[index][2]);
+            }
+            pixels[static_cast<std::size_t>(y * kTestFrameWidth + x)] = color;
+        }
+    }
+
+    jintArray result = env->NewIntArray(count);
+    if (result == nullptr) return nullptr;
+    env->SetIntArrayRegion(result, 0, count, pixels.data());
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return nullptr;
+    }
+    return result;
 }
