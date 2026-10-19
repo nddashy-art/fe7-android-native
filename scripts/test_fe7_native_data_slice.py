@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 UNITS = (
-    "util", "text", "face", "unit", "bm", "map",
+    "util", "text", "face", "hardware", "proc", "unit", "bm", "map",
     "sprite", "icon", "msg", "debug_text", "banim_sprite",
 )
 
