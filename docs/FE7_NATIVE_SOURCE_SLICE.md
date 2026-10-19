@@ -31,6 +31,12 @@ For `armeabi-v7a` only, CMake additionally compiles `src/m4a.c` to an object. It
 
 For `armeabi-v7a` only, CMake also invokes an assembly compile probe for eight original units: `asm/code.s` (through a generated normalized copy), `asm/code_1.s`, `asm/event.s`, `asm/fake_glue.s`, `src/armfunc.s`, `src/crt0.s`, `src/gbasvc.s`, and `src/sio_link_loader.s`. The probe produces object files but deliberately does not link or execute them. The source normalizer removes one adjacent duplicate local-label declaration from a generated copy of `code.s`, without editing the user’s source tree. ARM64 cannot consume these ARMv7 objects.
 
+## Software PPU baseline
+
+The native runtime now includes `gba_ppu.cpp` and exposes `fe7_gba_render_frame()` through the GBA bridge. It renders mode-0 text backgrounds, the two text backgrounds available in mode 1, 4bpp/8bpp tiles, palette colors, scroll offsets, and regular non-affine objects with basic priority/transparency. The host test paints a synthetic red text background, verifies forced-blank white, and checks a green sprite over the background. OAM starts with unused objects hidden to avoid undefined-looking pixels after reset.
+
+This is only the first PPU slice. Affine backgrounds/objects, bitmap modes, windows, mosaic, semi-transparent objects, and color effects are unsupported; full GBA register side effects/timing are also incomplete. The renderer is exposed for the future native frame loop but is **not yet called by the Android gameplay UI**, which still runs mGBA.
+
 ## What this milestone proves — and does not prove
 
 It proves a reproducible route for building a real, ROM-independent slice of FE7's own C source and packaging it with the Android native library. It does **not** link or call `AgbMain`, link the probed service/ARM7TDMI assembly objects, render the GBA PPU, run game audio, or reach the title screen. Compiling `main.c` alone proves source-level compatibility for that translation unit only. The app's current play path remains mGBA/libretro until the complete engine and its platform dependencies are ported and verified.
