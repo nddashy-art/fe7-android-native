@@ -10,6 +10,8 @@ import android.os.Looper
 import android.view.MotionEvent
 import android.provider.OpenableColumns
 import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.Button
@@ -21,7 +23,7 @@ import java.util.Locale
 /**
  * Prototype launcher with a user-selected ROM document.
  * The ROM remains at its chosen location; this app does not upload or copy it.
- * This screen reads only the GBA header. The game engine is not integrated yet.
+ * Native Android launcher and mGBA-backed GBA gameplay screen.
  */
 class MainActivity : Activity() {
     private lateinit var romStatus: TextView
@@ -63,6 +65,7 @@ class MainActivity : Activity() {
     private fun showLauncher() {
         gameLoopActive = false
         frameHandler.removeCallbacksAndMessages(null)
+        window.decorView.systemUiVisibility = 0
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -162,18 +165,17 @@ class MainActivity : Activity() {
         nativeSetButtons(0)
         gameLoopActive = true
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(10, 8, 10, 8)
-            setBackgroundColor(0xFF10151E.toInt())
-        }
-        val title = TextView(this).apply {
-            text = "FIRE EMBLEM · mGBA"
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setTextColor(0xFFFFD98A.toInt())
-        }
+        // Fullscreen landscape; touch controls float over the image edges.
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        )
+
+        val root = FrameLayout(this).apply { setBackgroundColor(0xFF05070B.toInt()) }
         val image = ImageView(this).apply {
             scaleType = ImageView.ScaleType.FIT_CENTER
             setBackgroundColor(0xFF05070B.toInt())
@@ -183,30 +185,38 @@ class MainActivity : Activity() {
         gameBitmap = bitmap
         gameImage = image
         image.setImageBitmap(bitmap)
+        root.addView(image, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
+        ))
 
         val controls = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(8, 4, 8, 4)
+            setBackgroundColor(0x66080B12)
         }
-        val directions = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-        }
+        val directions = LinearLayout(this).apply { gravity = Gravity.CENTER }
         addGameButton(directions, "↑", 4)
         addGameButton(directions, "↓", 5)
         addGameButton(directions, "←", 6)
         addGameButton(directions, "→", 7)
-        val actions = LinearLayout(this).apply {
-            gravity = Gravity.CENTER
-        }
+        val actions = LinearLayout(this).apply { gravity = Gravity.CENTER }
         addGameButton(actions, "B", 0)
         addGameButton(actions, "A", 8)
-        addGameButton(actions, "SELECT", 2)
-        addGameButton(actions, "START", 3)
-        controls.addView(directions, layoutParams(bottom = 2))
-        controls.addView(actions, layoutParams(bottom = 2))
+        addGameButton(actions, "SEL", 2)
+        addGameButton(actions, "STA", 3)
+        controls.addView(directions, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        controls.addView(actions, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(controls, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM
+        ))
 
         val back = Button(this).apply {
-            text = "Detener juego y volver"
+            text = "×"
+            textSize = 20f
+            contentDescription = "Detener juego y volver al selector"
+            setPadding(0, 0, 0, 0)
+            alpha = 0.78f
             setOnClickListener {
                 gameLoopActive = false
                 frameHandler.removeCallbacksAndMessages(null)
@@ -217,22 +227,22 @@ class MainActivity : Activity() {
                 showLauncher()
             }
         }
-
-        root.addView(title, layoutParams(bottom = 4))
-        root.addView(image, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
-        root.addView(controls, layoutParams(bottom = 2))
-        root.addView(back, layoutParams())
+        root.addView(back, FrameLayout.LayoutParams(dp(48), dp(44), Gravity.TOP or Gravity.END))
         setContentView(root)
         renderGameFrame()
     }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun addGameButton(parent: LinearLayout, label: String, retroButtonId: Int) {
         val button = Button(this).apply {
             text = label
             textSize = if (label.length > 2) 10f else 14f
+            minHeight = dp(42)
+            minWidth = dp(42)
             setPadding(4, 2, 4, 2)
+            alpha = 0.82f
             setOnTouchListener { _, event ->
                 val mask = 1 shl retroButtonId
                 when (event.actionMasked) {
