@@ -30,7 +30,7 @@ int main() {
     assert(decoded_size == 3 && decoded[0] == 'A' && decoded[1] == 'B' && decoded[2] == 'C');
 
     // Back-reference: "ABCABC", literals A/B/C then length-3, displacement-3.
-    const std::uint8_t repeated[] = {0x10, 6, 0, 0, 0x10, 'A', 'B', 'C', 0x00, 0x20};
+    const std::uint8_t repeated[] = {0x10, 6, 0, 0, 0x10, 'A', 'B', 'C', 0x00, 0x02};
     std::array<std::uint8_t, 6> decoded_repeated{};
     assert(Lz77UnCompWram(repeated, sizeof(repeated), decoded_repeated.data(),
                           decoded_repeated.size(), &decoded_size));
