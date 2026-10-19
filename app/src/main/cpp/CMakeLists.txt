@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(fe7native LANGUAGES C CXX)
+project(fe7native LANGUAGES C CXX ASM)
 
 set(MGBA_CORE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/mgba_libretro.so")
 if(NOT EXISTS "${MGBA_CORE_PATH}")
@@ -85,6 +85,50 @@ if(FE7_SOURCE_ROOT)
         "${CMAKE_CURRENT_SOURCE_DIR}"
     )
     add_dependencies(fe7native fe7_engine_startup_probe)
+
+    # The original assembly is buildable as ARMv7 objects for the 32-bit
+    # Android ABI. Keep this as a compile probe for now: the GBA absolute
+    # memory layout and ROM-backed data sections prevent linking/execution yet.
+    if(ANDROID_ABI STREQUAL "armeabi-v7a")
+        find_package(Python3 COMPONENTS Interpreter REQUIRED)
+        get_filename_component(FE7_NATIVE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
+        set(FE7_ASM_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/fe7-asm")
+        set(FE7_ASM_NORMALIZED_CODE "${FE7_ASM_BUILD_DIR}/code-android.s")
+        add_custom_command(
+            OUTPUT "${FE7_ASM_NORMALIZED_CODE}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${FE7_ASM_BUILD_DIR}"
+            COMMAND "${Python3_EXECUTABLE}"
+                    "${FE7_NATIVE_REPO_ROOT}/scripts/prepare_fe7_native_assembly.py"
+                    "${FE7_SOURCE_ROOT}/asm/code.s"
+                    "${FE7_ASM_NORMALIZED_CODE}"
+            DEPENDS
+                "${FE7_SOURCE_ROOT}/asm/code.s"
+                "${FE7_NATIVE_REPO_ROOT}/scripts/prepare_fe7_native_assembly.py"
+            VERBATIM
+        )
+        set_source_files_properties("${FE7_ASM_NORMALIZED_CODE}" PROPERTIES GENERATED TRUE)
+        set(FE7_NATIVE_ASM_SOURCES
+            "${FE7_ASM_NORMALIZED_CODE}"
+            "${FE7_SOURCE_ROOT}/asm/code_1.s"
+            "${FE7_SOURCE_ROOT}/asm/event.s"
+            "${FE7_SOURCE_ROOT}/asm/fake_glue.s"
+            "${FE7_SOURCE_ROOT}/src/armfunc.s"
+            "${FE7_SOURCE_ROOT}/src/crt0.s"
+            "${FE7_SOURCE_ROOT}/src/gbasvc.s"
+            "${FE7_SOURCE_ROOT}/src/sio_link_loader.s"
+        )
+        foreach(FE7_ASM_SOURCE IN LISTS FE7_NATIVE_ASM_SOURCES)
+            if(NOT EXISTS "${FE7_ASM_SOURCE}" AND NOT FE7_ASM_SOURCE STREQUAL FE7_ASM_NORMALIZED_CODE)
+                message(FATAL_ERROR "Required FE7 assembly source is missing: ${FE7_ASM_SOURCE}")
+            endif()
+        endforeach()
+        add_library(fe7_engine_asm_probe OBJECT ${FE7_NATIVE_ASM_SOURCES})
+        target_include_directories(fe7_engine_asm_probe PRIVATE "${FE7_SOURCE_ROOT}/include")
+        set_target_properties(fe7_engine_asm_probe PROPERTIES POSITION_INDEPENDENT_CODE YES)
+        add_dependencies(fe7native fe7_engine_asm_probe)
+        message(STATUS "FE7 ARMv7 assembly probe enabled: 8 original ASM units compile only; they are not linked or executed.")
+    endif()
+
     message(STATUS "FE7 native source slice enabled: 13 linked data units plus AgbMain compile probe; game boot is not yet implemented.")
 else()
     message(STATUS "FE7_SOURCE_ROOT not set: building the current Android shell/runtime only.")
