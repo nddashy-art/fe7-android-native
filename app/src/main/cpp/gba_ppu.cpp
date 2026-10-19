@@ -1,9 +1,7 @@
 #include "gba_ppu.h"
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
-#include <cstring>
 
 namespace fe7::gba {
 namespace {
@@ -134,121 +132,99 @@ bool PpuRenderer::RenderTextBackgroundPixel(unsigned bg, unsigned x, unsigned y,
     return true;
 }
 
-bool PpuRenderer::ReadObjectPixel(unsigned x, unsigned y, unsigned* priority,
-                                  unsigned* oam_index, std::uint32_t* color) const {
-    if (priority == nullptr || oam_index == nullptr || color == nullptr) return false;
-    bool found = false;
-    std::uint16_t best_rank = 0xFFFFu;
-    unsigned best_priority = 4;
-    unsigned best_index = 128;
-
+void PpuRenderer::RenderObject(unsigned oam_index) {
     std::uint16_t display_control = 0;
     if (!Read16(memory_, kDisplayControl, &display_control) ||
-        (display_control & kObjEnable) == 0) return false;
+        (display_control & kObjEnable) == 0) return;
     const bool one_dimensional = (display_control & kObjOneDimensional) != 0;
 
-    for (unsigned i = 0; i < 128; ++i) {
-        std::uint16_t attr0 = 0, attr1 = 0, attr2 = 0;
-        const std::uint32_t entry = kOamBase + i * 8u;
-        if (!Read16(memory_, entry, &attr0) ||
-            !Read16(memory_, entry + 2u, &attr1) ||
-            !Read16(memory_, entry + 4u, &attr2)) {
-            continue;
-        }
-        const bool affine = (attr0 & kOamAttr0Affine) != 0;
-        if (affine) continue; // Affine OBJ matrices are not implemented in this baseline.
-        if ((attr0 & kOamAttr0Disable) != 0) continue;
-        const unsigned object_mode = (attr0 & kOamAttr0ModeMask) >> 10;
-        if (object_mode != 0) continue; // Semi-transparent and OBJ-window modes need later blending/window work.
+    std::uint16_t attr0 = 0, attr1 = 0, attr2 = 0;
+    const std::uint32_t entry = kOamBase + oam_index * 8u;
+    if (!Read16(memory_, entry, &attr0) ||
+        !Read16(memory_, entry + 2u, &attr1) ||
+        !Read16(memory_, entry + 4u, &attr2)) return;
 
-        const unsigned shape = (attr0 & kOamAttr0ShapeMask) >> 14;
-        const unsigned size = (attr1 >> 14) & 3u;
-        unsigned width = 0, height = 0;
-        if (!ShapeSize(shape, size, &width, &height)) continue;
+    const bool affine = (attr0 & kOamAttr0Affine) != 0;
+    if (affine) return;  // Affine OBJ matrices are not implemented in this baseline.
+    if ((attr0 & kOamAttr0Disable) != 0) return;
+    const unsigned object_mode = (attr0 & kOamAttr0ModeMask) >> 10;
+    if (object_mode != 0) return;  // Blending/OBJ-window behavior needs later renderer work.
 
-        int object_x = static_cast<int>(attr1 & 0x1FFu);
-        int object_y = static_cast<int>(attr0 & 0xFFu);
-        if (object_x >= 256) object_x -= 512;
-        if (object_y >= 160) object_y -= 256;
-        const int local_x = static_cast<int>(x) - object_x;
-        const int local_y = static_cast<int>(y) - object_y;
-        if (local_x < 0 || local_y < 0 ||
-            local_x >= static_cast<int>(width) || local_y >= static_cast<int>(height)) {
-            continue;
-        }
+    const unsigned shape = (attr0 & kOamAttr0ShapeMask) >> 14;
+    const unsigned size = (attr1 >> 14) & 3u;
+    unsigned width = 0, height = 0;
+    if (!ShapeSize(shape, size, &width, &height)) return;
 
-        const bool color256 = (attr0 & kOamAttr0Color256) != 0;
-        unsigned source_x = static_cast<unsigned>(local_x);
-        unsigned source_y = static_cast<unsigned>(local_y);
-        if ((attr1 & kOamAttr1HFlip) != 0) source_x = width - 1u - source_x;
-        if ((attr1 & kOamAttr1VFlip) != 0) source_y = height - 1u - source_y;
+    int object_x = static_cast<int>(attr1 & 0x1FFu);
+    int object_y = static_cast<int>(attr0 & 0xFFu);
+    if (object_x >= 256) object_x -= 512;
+    if (object_y >= 160) object_y -= 256;
 
-        const unsigned tile_x = source_x >> 3;
-        const unsigned tile_y = source_y >> 3;
-        const unsigned tiles_wide = width / 8u;
-        const unsigned tile_number = attr2 & 0x3FFu;
-        const unsigned tile_base = color256 ? (tile_number & ~1u) : tile_number;
-        const unsigned tile_bytes = color256 ? 64u : 32u;
-        const unsigned tile_offset = one_dimensional
-            ? (tile_y * tiles_wide + tile_x) * tile_bytes
-            : tile_y * 0x400u + tile_x * tile_bytes;
-        const std::uint32_t tile_address = kVramBase + 0x10000u +
-            tile_base * 32u + tile_offset;
-        if (tile_address < kVramBase + 0x10000u ||
-            tile_address >= kVramBase + 0x18000u) continue;
+    const bool color256 = (attr0 & kOamAttr0Color256) != 0;
+    const unsigned tile_base = color256 ? ((attr2 & 0x3FFu) & ~1u) : (attr2 & 0x3FFu);
+    const unsigned tile_bytes = color256 ? 64u : 32u;
+    const unsigned tiles_wide = width / 8u;
+    const unsigned object_priority = (attr2 >> 10) & 3u;
+    const std::uint16_t object_rank =
+        static_cast<std::uint16_t>(object_priority * 1000u + oam_index);
 
-        std::uint8_t value = 0;
-        const unsigned within_x = source_x & 7u;
-        const unsigned within_y = source_y & 7u;
-        const std::uint32_t pixel_address = tile_address +
-            (color256 ? within_y * 8u + within_x
-                      : within_y * 4u + within_x / 2u);
-        if (!memory_.Read8(pixel_address, &value)) continue;
+    for (unsigned dy = 0; dy < height; ++dy) {
+        const int screen_y = object_y + static_cast<int>(dy);
+        if (screen_y < 0 || screen_y >= static_cast<int>(kPpuFrameHeight)) continue;
+        for (unsigned dx = 0; dx < width; ++dx) {
+            const int screen_x = object_x + static_cast<int>(dx);
+            if (screen_x < 0 || screen_x >= static_cast<int>(kPpuFrameWidth)) continue;
 
-        unsigned palette_index = 0;
-        if (color256) {
-            palette_index = value;
-        } else {
-            const unsigned nibble = (within_x & 1u) ? (value >> 4) : (value & 0x0Fu);
-            if (nibble == 0) continue; // OBJ palette index zero is transparent.
-            palette_index = ((attr2 >> 12) & 0x0Fu) * 16u + nibble;
-        }
-        if (color256 && palette_index == 0) continue;
+            unsigned source_x = dx;
+            unsigned source_y = dy;
+            if ((attr1 & kOamAttr1HFlip) != 0) source_x = width - 1u - source_x;
+            if ((attr1 & kOamAttr1VFlip) != 0) source_y = height - 1u - source_y;
 
-        const unsigned object_priority = (attr2 >> 10) & 3u;
-        const std::uint16_t candidate_rank =
-            static_cast<std::uint16_t>(object_priority * 1000u + i);
-        if (candidate_rank < best_rank) {
-            best_rank = candidate_rank;
-            best_priority = object_priority;
-            best_index = i;
-            *color = ReadPaletteColor(256u + palette_index);
-            found = true;
-        }
-    }
+            const unsigned tile_x = source_x >> 3;
+            const unsigned tile_y = source_y >> 3;
+            const unsigned tile_offset = one_dimensional
+                ? (tile_y * tiles_wide + tile_x) * tile_bytes
+                : tile_y * 0x400u + tile_x * tile_bytes;
+            const std::uint32_t tile_address = kVramBase + 0x10000u +
+                tile_base * 32u + tile_offset;
+            if (tile_address < kVramBase + 0x10000u ||
+                tile_address >= kVramBase + 0x18000u) continue;
 
-    if (found) {
-        *priority = best_priority;
-        *oam_index = best_index;
-    }
-    return found;
-}
+            const unsigned within_x = source_x & 7u;
+            const unsigned within_y = source_y & 7u;
+            const std::uint32_t pixel_address = tile_address +
+                (color256 ? within_y * 8u + within_x
+                          : within_y * 4u + within_x / 2u);
+            std::uint8_t packed = 0;
+            if (!memory_.Read8(pixel_address, &packed)) continue;
 
-void PpuRenderer::RenderObjects() {
-    for (unsigned y = 0; y < kPpuFrameHeight; ++y) {
-        for (unsigned x = 0; x < kPpuFrameWidth; ++x) {
-            unsigned priority = 4, oam_index = 128;
-            std::uint32_t color = 0xFF000000u;
-            if (!ReadObjectPixel(x, y, &priority, &oam_index, &color)) continue;
-            const std::size_t pixel = static_cast<std::size_t>(y) * kPpuFrameWidth + x;
-            const std::uint16_t rank =
-                static_cast<std::uint16_t>(priority * 1000u + oam_index);
-            if (rank < pixels_[pixel].rank) {
-                pixels_[pixel].rank = rank;
-                pixels_[pixel].color = color;
+            unsigned palette_index = 0;
+            if (color256) {
+                palette_index = packed;
+            } else {
+                const unsigned nibble = (within_x & 1u) ? (packed >> 4) : (packed & 0x0Fu);
+                if (nibble == 0) continue;  // OBJ palette index zero is transparent.
+                palette_index = ((attr2 >> 12) & 0x0Fu) * 16u + nibble;
+            }
+            if (color256 && palette_index == 0) continue;
+
+            const std::size_t pixel =
+                static_cast<std::size_t>(screen_y) * kPpuFrameWidth +
+                static_cast<unsigned>(screen_x);
+            if (object_rank < pixels_[pixel].rank) {
+                pixels_[pixel].rank = object_rank;
+                pixels_[pixel].color = ReadPaletteColor(256u + palette_index);
             }
         }
     }
+}
+
+void PpuRenderer::RenderObjects() {
+    std::uint16_t display_control = 0;
+    if (!Read16(memory_, kDisplayControl, &display_control) ||
+        (display_control & kObjEnable) == 0) return;
+    for (unsigned i = 0; i < 128; ++i)
+        RenderObject(i);
 }
 
 bool PpuRenderer::RenderFrame(std::uint32_t* output_rgba, std::size_t pixel_count) {
