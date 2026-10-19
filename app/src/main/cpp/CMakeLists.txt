@@ -121,6 +121,26 @@ if(FE7_SOURCE_ROOT)
     # Android ABI. Keep this as a compile probe for now: the GBA absolute
     # memory layout and ROM-backed data sections prevent linking/execution yet.
     if(ANDROID_ABI STREQUAL "armeabi-v7a")
+        # The C sound driver compiles for ARMv7 but contains a GBA SWI call,
+        # so it is a compile-only probe and is not linked/executed.
+        if(NOT EXISTS "${FE7_SOURCE_ROOT}/src/m4a.c")
+            message(FATAL_ERROR "Required FE7 sound driver source is missing: ${FE7_SOURCE_ROOT}/src/m4a.c")
+        endif()
+        add_library(fe7_engine_m4a_probe OBJECT "${FE7_SOURCE_ROOT}/src/m4a.c")
+        set_target_properties(fe7_engine_m4a_probe PROPERTIES
+            C_STANDARD 11
+            C_STANDARD_REQUIRED YES
+            C_EXTENSIONS YES
+            POSITION_INDEPENDENT_CODE YES
+        )
+        target_compile_definitions(fe7_engine_m4a_probe PRIVATE FE7_NATIVE_PORT=1)
+        target_compile_options(fe7_engine_m4a_probe PRIVATE -Wall -Wextra)
+        target_include_directories(fe7_engine_m4a_probe PRIVATE
+            "${FE7_SOURCE_ROOT}/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+        add_dependencies(fe7native fe7_engine_m4a_probe)
+
         find_package(Python3 COMPONENTS Interpreter REQUIRED)
         get_filename_component(FE7_NATIVE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
         set(FE7_ASM_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/fe7-asm")
@@ -162,7 +182,7 @@ if(FE7_SOURCE_ROOT)
         )
         set_target_properties(fe7_engine_asm_probe PROPERTIES POSITION_INDEPENDENT_CODE YES)
         add_dependencies(fe7native fe7_engine_asm_probe)
-        message(STATUS "FE7 ARMv7 assembly probe enabled: 8 original ASM units compile only; they are not linked or executed.")
+        message(STATUS "FE7 ARMv7 sound/assembly probes enabled: m4a.c plus 8 original ASM units compile only; they are not linked or executed.")
     endif()
 
     message(STATUS "FE7 native source slice enabled: 13 linked C units, 5 service compile probes, AgbMain compile probe; game boot is not yet implemented.")
