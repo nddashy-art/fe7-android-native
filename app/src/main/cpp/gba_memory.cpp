@@ -50,7 +50,7 @@ std::size_t MemoryBus::ReadableBytesFrom(std::uint32_t address) const {
         const std::uint64_t offset = static_cast<std::uint64_t>(address) - base;
         return offset < size ? size - static_cast<std::size_t>(offset) : 0;
     };
-    for (const auto region : {std::pair<std::uint32_t, std::size_t>{kEwramBase, kEwramSize},
+    for (const auto& region : {std::pair<std::uint32_t, std::size_t>{kEwramBase, kEwramSize},
                               {kIwramBase, kIwramSize}, {kIoBase, kIoSize},
                               {kPaletteBase, kPaletteSize}, {kVramBase, kVramSize},
                               {kOamBase, kOamSize}, {kSramBase, kSramSize}}) {
@@ -70,7 +70,7 @@ std::size_t MemoryBus::WritableBytesFrom(std::uint32_t address) const {
         const std::uint64_t offset = static_cast<std::uint64_t>(address) - base;
         return offset < size ? size - static_cast<std::size_t>(offset) : 0;
     };
-    for (const auto region : {std::pair<std::uint32_t, std::size_t>{kEwramBase, kEwramSize},
+    for (const auto& region : {std::pair<std::uint32_t, std::size_t>{kEwramBase, kEwramSize},
                               {kIwramBase, kIwramSize}, {kIoBase, kIoSize},
                               {kPaletteBase, kPaletteSize}, {kVramBase, kVramSize},
                               {kOamBase, kOamSize}, {kSramBase, kSramSize}}) {
