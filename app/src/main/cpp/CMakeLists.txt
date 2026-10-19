@@ -123,7 +123,10 @@ if(FE7_SOURCE_ROOT)
             endif()
         endforeach()
         add_library(fe7_engine_asm_probe OBJECT ${FE7_NATIVE_ASM_SOURCES})
-        target_include_directories(fe7_engine_asm_probe PRIVATE "${FE7_SOURCE_ROOT}/include")
+        target_include_directories(fe7_engine_asm_probe PRIVATE
+            "${FE7_SOURCE_ROOT}"
+            "${FE7_SOURCE_ROOT}/include"
+        )
         set_target_properties(fe7_engine_asm_probe PROPERTIES POSITION_INDEPENDENT_CODE YES)
         add_dependencies(fe7native fe7_engine_asm_probe)
         message(STATUS "FE7 ARMv7 assembly probe enabled: 8 original ASM units compile only; they are not linked or executed.")
