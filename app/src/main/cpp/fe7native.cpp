@@ -282,6 +282,21 @@ Java_org_fe7android_nativeport_MainActivity_nativeRunFrameInto(
 extern "C" JNIEXPORT void JNICALL
 Java_org_fe7android_nativeport_MainActivity_nativeSetButtons(JNIEnv*, jobject, jint buttons) {
     g_buttons = static_cast<unsigned>(buttons);
+
+    // Libretro uses a different button order than GBA KEYINPUT. Preserve
+    // g_buttons for mGBA and mirror the same physical presses to the native bus.
+    std::uint16_t gba_pressed = 0;
+    if (g_buttons & (1u << 8))  gba_pressed |= 1u << 0; // A
+    if (g_buttons & (1u << 0))  gba_pressed |= 1u << 1; // B
+    if (g_buttons & (1u << 2))  gba_pressed |= 1u << 2; // Select
+    if (g_buttons & (1u << 3))  gba_pressed |= 1u << 3; // Start
+    if (g_buttons & (1u << 7))  gba_pressed |= 1u << 4; // Right
+    if (g_buttons & (1u << 6))  gba_pressed |= 1u << 5; // Left
+    if (g_buttons & (1u << 4))  gba_pressed |= 1u << 6; // Up
+    if (g_buttons & (1u << 5))  gba_pressed |= 1u << 7; // Down
+    if (g_buttons & (1u << 11)) gba_pressed |= 1u << 8; // R
+    if (g_buttons & (1u << 10)) gba_pressed |= 1u << 9; // L
+    fe7_gba_set_keys(gba_pressed);
 }
 
 extern "C" JNIEXPORT void JNICALL
