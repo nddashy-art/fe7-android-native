@@ -1,14 +1,23 @@
 # FE7 native-port implementation roadmap
 
-The supplied `fe7_us-main.zip` has now been inspected and its archive checksum recorded in `docs/FE7_SOURCE_ARCHIVE_INVENTORY.md`. The branch has a software GBA runtime foundation and source adapters, but no FE7 gameplay source has yet been compiled into the Android runtime.
+The supplied FE7 US decompilation archive has been inventoried and its checksum recorded in `docs/FE7_SOURCE_ARCHIVE_INVENTORY.md`. The repository now has the software GBA runtime foundation and an opt-in Android build path that compiles and links 11 genuine, ROM-independent FE7 C translation units. The actual gameplay engine is still not linked or booted.
 
-Next engineering sequence:
+## Completed milestones
 
-1. Inspect `include/gbaio.h`, `include/gbasvc.h`, `src/hardware.c`, `src/gbasvc.s`, `src/interrupt.c`, and `src/main.c` to define the minimal GBA platform boundary. (Done for the first pass.)
-2. Create a host-testable portability target for the safe, hardware-independent utilities that can be separated without relying on GBA memory addresses or ARM7 assembly.
-3. Add tests using synthetic inputs and no ROM, and wire this target into Android CMake as a separate library rather than replacing the existing launcher target.
-4. Decide whether a direct decompilation port can reasonably implement all required hardware behavior or whether a reusable GBA compatibility layer is necessary. Keep that decision evidence-based and document each dependency.
-5. The source-preparation script now conditionally splits `AgbMain` into one-time initialization and `Fe7EngineRunFrame()` under `FE7_NATIVE_PORT`; this lets an Android host own frame pacing instead of trapping inside FE7's infinite loop. It is still an adapter, not proof that `main.c` or the full engine compiles on Android.
-6. Next, port or replace the ARM-only BIOS/service assembly and map graphics, timers, input, SRAM, and audio to the software GBA runtime. Then compile/link the adapted FE7 source and call `AgbMain` once plus `Fe7EngineRunFrame()` on the native engine thread. Only after that can a real title-screen boot be tested.
+- Software GBA memory bus plus initial BIOS-compatible helpers, DMA and IRQ services, with host tests.
+- Source adapter script that conditionally maps GBA memory/registers, DMA, interrupts, SRAM fast routines and the `AgbMain` loop to the host bridge. The script is regression-tested but does not mean every adapted engine file compiles.
+- Optional `FE7_SOURCE_ROOT` CMake/Gradle wiring for the local FE7 decompilation.
+- First authentic source slice: `util.c`, `text.c`, `face.c`, `unit.c`, `bm.c`, `map.c`, `sprite.c`, `icon.c`, `msg.c`, `debug_text.c`, and `banim_sprite.c` compile/link as a shared native object in the local smoke test and are bundled into `libfe7native.so` when the source root is provided.
 
-Do not claim the app is playable until a physical-device build boots the actual FE7 engine. Keep the ROM picker, and do not commit ROMs or extracted commercial assets.
+## Next engineering sequence
+
+1. Compile the adapted `src/main.c` as an isolated object and iteratively resolve type, memory, and BIOS/service incompatibilities without attempting a full link yet.
+2. Bring over the smallest startup dependencies in dependency order: key state, SRAM/save compatibility, process manager, sprite system, RNG, and audio initialization. Replace unsupported ARM7TDMI service assembly with tested C equivalents or explicitly isolate the remaining assembly.
+3. Build a testable engine lifecycle that calls `AgbMain` once and then `Fe7EngineRunFrame()` at a deterministic 59.7 Hz cadence; add synthetic tests for initialization failure, one-frame execution and shutdown.
+4. Add GBA timing, VBlank/HBlank, timers and a software 240×160 PPU path. The current memory bus and DMA/IRQ services are incomplete, and direct reads/writes of IO registers are not yet full GBA hardware semantics.
+5. Trace FE7's MP2K APIs, voice data and driver dependencies before connecting an Android PCM backend. Use TMC / Project Picori as an architectural reference only, not as a drop-in engine.
+6. Connect the native engine path behind a clearly gated runtime switch, preserving the existing shell as a fallback until the native path is proved.
+
+## Verification rule
+
+The current opt-in source slice is only proof that authentic FE7 C data modules compile and are packaged; it does not call `AgbMain`, render a frame, play FE7 audio, or reach the title screen. Do not report a playable native port until an Android device boots the actual FE7 engine to its title screen. Keep ROMs and proprietary extracted assets out of Git and CI.
