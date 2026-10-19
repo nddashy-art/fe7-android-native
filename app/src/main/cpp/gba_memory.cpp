@@ -1,5 +1,7 @@
 #include "gba_memory.h"
 
+#include <utility>
+
 namespace fe7::gba {
 namespace {
 bool RangeInside(std::uint32_t address, std::size_t length,
@@ -40,6 +42,42 @@ const T* MemoryBus::ResolveArray(const std::array<T, N>& bytes, std::uint32_t ad
                                  std::uint32_t base, std::size_t length) {
     if (!RangeInside(address, length, base, N)) return nullptr;
     return bytes.data() + (address - base);
+}
+
+std::size_t MemoryBus::ReadableBytesFrom(std::uint32_t address) const {
+    const auto remaining = [address](std::uint32_t base, std::size_t size) -> std::size_t {
+        if (address < base) return 0;
+        const std::uint64_t offset = static_cast<std::uint64_t>(address) - base;
+        return offset < size ? size - static_cast<std::size_t>(offset) : 0;
+    };
+    for (const auto region : {std::pair<std::uint32_t, std::size_t>{kEwramBase, kEwramSize},
+                              {kIwramBase, kIwramSize}, {kIoBase, kIoSize},
+                              {kPaletteBase, kPaletteSize}, {kVramBase, kVramSize},
+                              {kOamBase, kOamSize}, {kSramBase, kSramSize}}) {
+        const auto bytes = remaining(region.first, region.second);
+        if (bytes != 0) return bytes;
+    }
+    if (rom_ != nullptr && address >= kRomBase && address < kRomLimit) {
+        const std::size_t offset = static_cast<std::size_t>(address - kRomBase) % rom_size_;
+        return rom_size_ - offset;
+    }
+    return 0;
+}
+
+std::size_t MemoryBus::WritableBytesFrom(std::uint32_t address) const {
+    const auto remaining = [address](std::uint32_t base, std::size_t size) -> std::size_t {
+        if (address < base) return 0;
+        const std::uint64_t offset = static_cast<std::uint64_t>(address) - base;
+        return offset < size ? size - static_cast<std::size_t>(offset) : 0;
+    };
+    for (const auto region : {std::pair<std::uint32_t, std::size_t>{kEwramBase, kEwramSize},
+                              {kIwramBase, kIwramSize}, {kIoBase, kIoSize},
+                              {kPaletteBase, kPaletteSize}, {kVramBase, kVramSize},
+                              {kOamBase, kOamSize}, {kSramBase, kSramSize}}) {
+        const auto bytes = remaining(region.first, region.second);
+        if (bytes != 0) return bytes;
+    }
+    return 0;
 }
 
 const std::uint8_t* MemoryBus::ResolveRead(std::uint32_t address, std::size_t length) const {
