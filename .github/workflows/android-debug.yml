@@ -57,6 +57,35 @@ jobs:
       - name: Build debug APK with the FE7 source slice enabled
         run: gradle --no-daemon :app:assembleDebug "-Pfe7SourceRoot=$GITHUB_WORKSPACE/fe7_us-main"
 
+      - name: Audit FE7 engine object symbols and relocations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t FE7_OBJECTS < <(find app/.cxx -type f -name '*.o' | grep -E '/CMakeFiles/fe7_engine_(seed|startup_probe|service_probe|m4a_probe|asm_probe)\.dir/' | sort)
+          if [ "${#FE7_OBJECTS[@]}" -eq 0 ]; then
+            echo "No FE7 compile-probe objects found in app/.cxx" >&2
+            find app/.cxx -maxdepth 5 -type d | head -80 || true
+            exit 1
+          fi
+          LLVM_NM="$(find "$ANDROID_HOME/ndk" -path '*/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm' -print -quit)"
+          if [ -z "$LLVM_NM" ]; then
+            echo "Could not locate NDK llvm-nm" >&2
+            exit 1
+          fi
+          python3 scripts/audit_fe7_native_objects.py \
+            --nm "$LLVM_NM" \
+            --readelf "${LLVM_NM%llvm-nm}llvm-readelf" \
+            --output "$RUNNER_TEMP/fe7-native-link-audit.txt" \
+            "${FE7_OBJECTS[@]}"
+          cat "$RUNNER_TEMP/fe7-native-link-audit.txt"
+
+      - name: Upload FE7 native link audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: fe7-native-link-audit
+          path: ${{ runner.temp }}/fe7-native-link-audit.txt
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload prototype APK
         uses: actions/upload-artifact@v4
         with:
