@@ -22,6 +22,13 @@ add_library(fe7runtime STATIC
 )
 target_compile_features(fe7runtime PUBLIC cxx_std_17)
 target_compile_options(fe7runtime PRIVATE -Wall -Wextra)
+
+# ARMv7 is the only Android ABI that can execute the original ARM7TDMI
+# instruction set directly. The fixed-address map is groundwork only; the FE7
+# engine is not linked into the shipping frontend yet.
+if(ANDROID AND ANDROID_ABI STREQUAL "armeabi-v7a")
+    target_compile_definitions(fe7runtime PRIVATE FE7_NATIVE_DIRECT_GBA_MEMORY=1)
+endif()
 target_include_directories(fe7runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 set_target_properties(fe7runtime PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
