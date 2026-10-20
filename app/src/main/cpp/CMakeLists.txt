@@ -206,8 +206,6 @@ if(FE7_SOURCE_ROOT)
             "${FE7_SOURCE_ROOT}/asm/event.s"
             "${FE7_SOURCE_ROOT}/asm/fake_glue.s"
             "${FE7_SOURCE_ROOT}/src/armfunc.s"
-            "${FE7_SOURCE_ROOT}/src/crt0.s"
-            "${FE7_SOURCE_ROOT}/src/gbasvc.s"
             "${FE7_SOURCE_ROOT}/src/sio_link_loader.s"
         )
         foreach(FE7_ASM_SOURCE IN LISTS FE7_NATIVE_ASM_SOURCES)
@@ -226,7 +224,7 @@ if(FE7_SOURCE_ROOT)
         if(TARGET fe7native)
             add_dependencies(fe7native fe7_engine_asm_probe)
         endif()
-        message(STATUS "FE7 ARMv7 sound/assembly probes enabled: m4a.c plus 8 original ASM units compile only; they are not linked or executed.")
+        message(STATUS "FE7 ARMv7 sound/assembly probes enabled: m4a.c plus 6 original ASM units compile only; GBA BIOS service wrappers and crt0 are excluded from the diagnostic object set because the native runtime provides overlapping symbols. These probes are not linked or executed.")
     endif()
 
     message(STATUS "FE7 native source slice enabled: 13 linked C units plus separate engine/startup compile probes; game boot is not yet implemented.")
