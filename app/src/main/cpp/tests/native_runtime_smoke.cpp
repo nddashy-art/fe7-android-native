@@ -12,6 +12,8 @@
 #include <iostream>
 #include <vector>
 
+extern "C" void InitSpriteAnims(void);
+
 int main() {
     using fe7::gba::MemoryBus;
 
@@ -42,6 +44,22 @@ int main() {
         fe7_gba_resolve_pointer(0x08000000u, 4, 0));
     assert(mapped_rom == rom.data());
     assert(mapped_rom[0xA0] == 'F');
+
+    // Validate the first real FE7 startup routine ported from ARM assembly:
+    // InitSpriteAnims clears one 32-bit field every 0x28 bytes in IWRAM.
+    auto* animation_entries = static_cast<std::uint32_t*>(
+        fe7_gba_resolve_pointer(0x03000110u, 0x2FCu, 1));
+    assert(animation_entries != nullptr);
+    std::memset(animation_entries, 0xA5, 0x2FCu);
+    InitSpriteAnims();
+    for (std::size_t offset = 0; offset <= 0x2F8u; offset += 0x28u) {
+        assert(animation_entries[offset / sizeof(std::uint32_t)] == 0u);
+        if (offset + sizeof(std::uint32_t) < 0x2FCu) {
+            assert(animation_entries[(offset + sizeof(std::uint32_t)) /
+                                     sizeof(std::uint32_t)] == 0xA5A5A5A5u);
+        }
+    }
+
     assert(fe7_gba_render_frame(nullptr, 0) == 0);
 
     // Exercise the software PPU with synthetic VRAM/palette data. This
@@ -89,6 +107,6 @@ int main() {
     assert(fe7_engine_prepare(invalid_rom.data(), invalid_rom.size()) == FE7_ENGINE_BOOT_INVALID_ROM);
     fe7_engine_shutdown();
 
-    std::cout << "Native GBA runtime smoke tests passed (header, memory, PPU; no FE7 CPU/game loop).\\n";
+    std::cout << "Native GBA runtime smoke tests passed (header, memory, InitSpriteAnims, PPU; no FE7 CPU/game loop).\\n";
     return 0;
 }
