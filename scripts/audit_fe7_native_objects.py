@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Audit undefined symbols and relocations in compiled FE7 native-port objects.
+"""Audit FE7 object symbols and relocations, grouped by Android ABI.
 
-This produces evidence for native-link integration; it does not claim that
-objects are safe to link or that AgbMain can execute on Android.
+This is an object-level inventory, not proof that the engine links or boots.
+Undefined symbols are resolved against other audited objects from the same ABI
+only; Android/system libraries and fe7runtime are outside this object set.
 """
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 import subprocess
 import sys
@@ -21,6 +22,38 @@ def run_tool(command: list[str]) -> str:
             f"{result.stderr.strip()}"
         )
     return result.stdout
+
+
+def symbols_from_nm(output: str) -> set[str]:
+    symbols: set[str] = set()
+    for line in output.splitlines():
+        fields = line.split()
+        if fields:
+            symbol = fields[-1]
+            if symbol and symbol not in {"U", "u"}:
+                symbols.add(symbol)
+    return symbols
+
+
+def abi_for(obj: Path) -> str:
+    for abi in ("arm64-v8a", "armeabi-v7a", "x86_64", "x86"):
+        if abi in obj.parts:
+            return abi
+    return "unknown-abi"
+
+
+def symbol_category(symbol: str) -> str:
+    if symbol.startswith("fe7_gba_"):
+        return "GBA bridge/runtime"
+    if symbol.startswith(("__", "_call_via_")):
+        return "compiler/runtime support"
+    if symbol.startswith("m4a") or symbol.startswith(("Sound", "MPlay", "ply_")):
+        return "audio engine"
+    if symbol.startswith("g") and len(symbol) > 1 and symbol[1].isupper():
+        return "global game data"
+    if symbol.startswith("func_"):
+        return "unnamed/game-address function"
+    return "game/API function or data"
 
 
 def main() -> int:
@@ -38,24 +71,24 @@ def main() -> int:
     lines = [
         "# FE7 native object link audit",
         "",
-        "This report inventories undefined symbols and relocations in compile-probe",
-        "objects. Undefined symbols may be satisfied by other objects; relocation",
-        "types/targets must be reviewed before attempting an Android shared-library link.",
+        "Undefined symbols are resolved against definitions in the audited object set",
+        "for the same Android ABI only. Symbols provided by fe7runtime, Android/system",
+        "libraries, ROM-backed data, or un-audited objects may still need separate work.",
+        "Relocation totals are diagnostic and do not alone determine link safety.",
         "",
         f"Objects audited: {len(args.objects)}",
         "",
     ]
     undefined_totals: Counter[str] = Counter()
     relocation_totals: Counter[str] = Counter()
-    failures: list[str] = []
+    undefined_by_abi: dict[str, Counter[str]] = defaultdict(Counter)
+    defined_by_abi: dict[str, set[str]] = defaultdict(set)
+    object_rows: list[tuple[Path, str, set[str], Counter[str]]] = []
 
     for obj in sorted(args.objects, key=lambda p: str(p)):
-        nm_output = run_tool([args.nm, "-u", str(obj)])
-        undefined = sorted({
-            line.split()[-1]
-            for line in nm_output.splitlines()
-            if line.split()
-        })
+        abi = abi_for(obj)
+        undefined = symbols_from_nm(run_tool([args.nm, "-u", str(obj)]))
+        defined = symbols_from_nm(run_tool([args.nm, "-g", "--defined-only", str(obj)]))
         reloc_output = run_tool([args.readelf, "-rW", str(obj)])
         relocations: Counter[str] = Counter()
         for line in reloc_output.splitlines():
@@ -65,28 +98,70 @@ def main() -> int:
 
         undefined_totals.update(undefined)
         relocation_totals.update(relocations)
-        lines.extend([f"## {obj}", "", f"Undefined symbols ({len(undefined)} unique):"])
-        lines.extend([f"- `{symbol}`" for symbol in undefined] or ["- None"])
+        undefined_by_abi[abi].update(undefined)
+        defined_by_abi[abi].update(defined)
+        object_rows.append((obj, abi, undefined, relocations))
+
+    for obj, abi, undefined, relocations in object_rows:
+        lines.extend([
+            f"## {obj}",
+            "",
+            f"ABI: {abi}",
+            "",
+            f"Undefined symbols ({len(undefined)} unique):",
+        ])
+        lines.extend([f"- {symbol}" for symbol in sorted(undefined)] or ["- None"])
         lines.extend(["", "Relocation types:"])
         lines.extend(
-            [f"- `{kind}`: {count}" for kind, count in sorted(relocations.items())]
+            [f"- {kind}: {count}" for kind, count in sorted(relocations.items())]
             or ["- None"]
         )
         lines.append("")
 
+    lines.extend(["## Cross-object unresolved candidates by ABI", ""])
+    lines.append(
+        "These symbols are undefined in at least one audited object and have no global "
+        "definition in the audited objects for that same ABI. They may still be supplied "
+        "by fe7runtime, Android/system libraries, or omitted source/data objects."
+    )
+    lines.append("")
+    unresolved_total = 0
+    for abi in sorted(undefined_by_abi):
+        unresolved = Counter({
+            symbol: count
+            for symbol, count in undefined_by_abi[abi].items()
+            if symbol not in defined_by_abi[abi]
+        })
+        unresolved_total += len(unresolved)
+        lines.extend([f"### {abi}", ""])
+        if not unresolved:
+            lines.append("- None")
+        else:
+            by_category: dict[str, Counter[str]] = defaultdict(Counter)
+            for symbol, count in unresolved.items():
+                by_category[symbol_category(symbol)][symbol] = count
+            for category in sorted(by_category):
+                lines.extend([f"**{category}**", ""])
+                lines.extend(
+                    f"- {symbol}: {count}"
+                    for symbol, count in by_category[category].most_common()
+                )
+                lines.append("")
+
     lines.extend([
-        "## Aggregate unresolved symbol references",
+        "## Aggregate per-object undefined references",
         "",
-        "Counts below are per-object references, not proof that a symbol is globally unresolved.",
+        "These counts include symbols later defined by another audited object and are not",
+        "the same as the unresolved-candidate section above.",
         "",
     ])
     lines.extend(
-        f"- `{symbol}`: {count}"
+        f"- {symbol}: {count}"
         for symbol, count in undefined_totals.most_common()
     )
     lines.extend(["", "## Aggregate relocation types", ""])
     lines.extend(
-        f"- `{kind}`: {count}"
+        f"- {kind}: {count}"
         for kind, count in sorted(relocation_totals.items())
     )
     lines.append("")
@@ -96,7 +171,8 @@ def main() -> int:
     print(
         f"Wrote {args.output}: {len(args.objects)} objects, "
         f"{len(undefined_totals)} distinct undefined symbols, "
-        f"{sum(relocation_totals.values())} relocations."
+        f"{sum(relocation_totals.values())} relocations, "
+        f"{unresolved_total} ABI-specific unresolved candidates."
     )
     return 0
 
