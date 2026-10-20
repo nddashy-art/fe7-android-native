@@ -15,6 +15,7 @@
 extern "C" void InitSpriteAnims(void);
 extern "C" void RandInitB(std::uint32_t seed);
 extern "C" std::uint32_t RandNextB(void);
+extern "C" void InitKeySt(void* keys);
 
 int main() {
     using fe7::gba::MemoryBus;
@@ -73,6 +74,24 @@ int main() {
     assert(RandNextB() == expected_rng_next);
     assert(*rng_state == expected_rng_next);
 
+    // InitKeySt is now native too; verify its documented field offsets and
+    // that the global key-repeat register in IWRAM is cleared.
+    std::array<std::uint8_t, 0x14> key_state{};
+    key_state.fill(0xA5u);
+    auto* key_repeat = static_cast<std::uint16_t*>(
+        fe7_gba_resolve_pointer(0x0300000Eu, sizeof(std::uint16_t), 1));
+    assert(key_repeat != nullptr);
+    *key_repeat = 0xFFFFu;
+    InitKeySt(key_state.data());
+    assert(key_state[0x00] == 0x0Cu);
+    assert(key_state[0x01] == 0x04u);
+    assert(key_state[0x02] == 0u);
+    assert(*reinterpret_cast<const std::uint16_t*>(key_state.data() + 0x04) == 0u);
+    assert(*reinterpret_cast<const std::uint16_t*>(key_state.data() + 0x08) == 0u);
+    assert(*reinterpret_cast<const std::uint16_t*>(key_state.data() + 0x0A) == 0u);
+    assert(*reinterpret_cast<const std::uint16_t*>(key_state.data() + 0x12) == 0u);
+    assert(*key_repeat == 0u);
+
     assert(fe7_gba_render_frame(nullptr, 0) == 0);
 
     // Exercise the software PPU with synthetic VRAM/palette data. This
@@ -120,6 +139,6 @@ int main() {
     assert(fe7_engine_prepare(invalid_rom.data(), invalid_rom.size()) == FE7_ENGINE_BOOT_INVALID_ROM);
     fe7_engine_shutdown();
 
-    std::cout << "Native GBA runtime smoke tests passed (header, memory, InitSpriteAnims, RandInitB/RandNextB, PPU; no FE7 CPU/game loop).\\n";
+    std::cout << "Native GBA runtime smoke tests passed (header, memory, InitSpriteAnims, InitKeySt, RandInitB/RandNextB, PPU; no FE7 CPU/game loop).\\n";
     return 0;
 }
