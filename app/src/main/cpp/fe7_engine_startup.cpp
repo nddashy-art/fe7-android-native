@@ -15,6 +15,14 @@ extern "C" Fe7EngineBootState fe7_engine_prepare(const std::uint8_t* rom, std::s
     fe7_gba_detach_rom();
     fe7_gba_reset(1);
 
+    // ARM32-only native engine experiments may need the original GBA numeric
+    // address ranges, because FE7's assembly dereferences them directly.
+#if defined(FE7_NATIVE_DIRECT_GBA_MEMORY)
+    const bool fixed_gba_memory = fe7_gba_enable_fixed_address_mapping() != 0;
+#else
+    const bool fixed_gba_memory = false;
+#endif
+
     fe7::GbaHeader header;
     if (rom == nullptr || rom_size < 0xC0 ||
         !fe7::ParseGbaHeader(rom, rom_size, &header) ||
@@ -31,7 +39,11 @@ extern "C" Fe7EngineBootState fe7_engine_prepare(const std::uint8_t* rom, std::s
     }
 
     g_state = FE7_ENGINE_BOOT_RUNTIME_PREPARED;
-    g_message = "ROM asociada y memoria GBA reiniciada; AgbMain todavia no esta enlazado.";
+    if (fixed_gba_memory) {
+        g_message = "ROM asociada; memoria GBA mapeada en direcciones originales, pero AgbMain todavia no esta enlazado.";
+    } else {
+        g_message = "ROM asociada y memoria GBA reiniciada; AgbMain todavia no esta enlazado.";
+    }
     return g_state;
 }
 

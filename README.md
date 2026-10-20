@@ -2,7 +2,7 @@
 
 An experimental effort to bring a **user-supplied, legally obtained Fire Emblem: The Blazing Blade (US)** build to Android, with touch controls, controller support, and eventually optional local-network multiplayer and mod support.
 
-> **Current status: launcher and native-diagnostics prototype only.** The app selects and remembers a user-supplied `.gba` file, inspects its header in C++, and now has a diagnostic screen that transfers a generated 240×160 ARGB frame through JNI into an Android bitmap. The original FE7 engine is not integrated, so the ROM is not executed and this is not a playable port.
+> **Current status: mGBA-backed Android gameplay prototype plus an incomplete native runtime.** The app selects a user-supplied `.gba` file and mGBA executes it. The experimental software GBA bus now attaches the same ROM buffer and has isolated host tests, and a real FE7 C source slice compiles in CI. However, the original FE7 engine entrypoint (`AgbMain`), CPU execution path, full timing, renderer and audio are not integrated; this is not yet a native FE7 port.
 
 ## Goals
 
@@ -16,7 +16,7 @@ An experimental effort to bring a **user-supplied, legally obtained Fire Emblem:
 ## Legal and source-content policy
 
 - **Do not commit a commercial ROM, BIOS, copyrighted game assets, or extracted proprietary data to this repository or CI artifacts.**
-- The app's ROM picker remembers a document URI on the device. The current prototype does not upload the selected file or pass it to a game engine.
+- The app reads the selected ROM locally and passes it to the bundled mGBA core for gameplay; it does not upload the ROM. The software native runtime borrows the in-memory buffer for diagnostics and detaches before that buffer is released.
 - This project is unofficial and is not affiliated with or endorsed by Nintendo.
 - The presence of a decompilation does not itself make it an Android port; platform integration and testing remain necessary.
 
@@ -29,9 +29,9 @@ An experimental effort to bring a **user-supplied, legally obtained Fire Emblem:
 - [x] Diagnostic 240×160 ARGB frame generated in C++ and displayed in Android
 - [x] Host-side synthetic tests for the portable header parser (runs in CI)
 - [x] GitHub Actions workflow configured for Android SDK, NDK, and CMake
-- [ ] Verify the updated native APK build in CI and on the user's device
+- [x] Verify the Android debug APK build in GitHub Actions (native FE7 gameplay remains unverified)
 - [ ] Verify the frame-test screen on the user’s physical device
-- [ ] Integrate the actual game engine/decompilation with the selected ROM
+- [ ] Link and execute the actual FE7 game engine/decompilation against the selected ROM
 - [ ] Boot to title screen on a real device
 - [ ] Touch controls and controller mapping
 - [ ] Persistent game saves and lifecycle handling
@@ -49,3 +49,24 @@ See [PORTING_PLAN.md](docs/PORTING_PLAN.md) for the staged technical plan and [D
 ## Contributions
 
 Please open an issue with device model, Android version, exact build logs, and steps to reproduce any failure. Do not attach ROMs or copyrighted game assets.
+
+
+### Native engine link audit
+
+The Android CI workflow now inventories undefined symbols and relocation types for real FE7 compile-probe objects, compares undefined references against definitions within each Android ABI, and groups remaining candidates by likely dependency class. The `fe7-native-link-audit` artifact is diagnostic evidence for the next integration step; it is not a successful engine link and does not mean the game is executing natively. See the [Android workflow](https://github.com/nddashy-art/fe7-android-native/actions/workflows/android-debug.yml).
+
+
+### First FE7 startup-routine ports
+
+The native runtime now contains C++ equivalents of four small startup routines verified against the pinned FE7 US source: `InitSpriteAnims`, `RandInitB`, `RandNextB`, and `InitKeySt`. The host smoke test checks the IWRAM animation-entry clearing pattern, the secondary RNG's 32-bit wraparound/state update, and key-state field initialization. These direct ports do not make `AgbMain` callable yet: the RAM-code installer, key refresh, `StartGame`, and many assembly/data dependencies remain.
+
+CI now also attempts a real diagnostic shared-library link of the compiled FE7 probe objects and runtime per Android ABI, then uploads the linker's unresolved-symbol/relocation diagnostics as `fe7-native-link-attempt`. This link attempt is intentionally not used as the app library; it is allowed to fail so we can resolve the actual blockers without breaking the known-good mGBA fallback APK.
+
+
+The first linker diagnostic surfaced two avoidable symbol-collision groups on 32-bit ARM: FE7 `gbasvc.s` redefines BIOS services already implemented by the native compatibility layer, and `crt0.s` redefines `IntrMain` already supplied by the C service probe. Those files have been removed from the diagnostic object set so the next link report can focus on engine dependencies rather than known duplicate implementations. This is diagnostic cleanup, not a successful engine link.
+
+### Fixed-address GBA memory experiment (ARMv7)
+
+The software memory bus has an optional fail-closed fixed-address mapping mode for the GBA regions, including the ROM window, EWRAM, IWRAM, I/O, VRAM, palette, OAM, and SRAM. It uses `MAP_FIXED_NOREPLACE` rather than replacing an existing Android mapping; if any requested range is occupied, setup fails without clobbering it. Host tests exercise direct numeric-address reads/writes and verify that the ROM bytes are visible in the mapped window. Android CI builds the APK with these changes.
+
+This is groundwork only. The native engine still cannot boot: the ARM32 diagnostic link reports absolute assembly relocations (`R_ARM_ABS32`) that Android will not accept in a shared library, and the ARM64 diagnostic reports required startup and gameplay routines that remain assembly-only. The original assembly needs genuine position-independent conversion or portable C/C++ replacements, and the missing startup/game-loop dependencies must be implemented before calling `AgbMain`. Do not treat a successful APK build or a successful memory-map test as a native FE7 boot.

@@ -9,6 +9,9 @@ extern "C" {
 
 int fe7_gba_attach_rom(const uint8_t* data, size_t size);
 void fe7_gba_detach_rom(void);
+// Optional ARM32 compatibility path: map GBA memory ranges at their original numeric addresses.
+int fe7_gba_enable_fixed_address_mapping(void);
+int fe7_gba_fixed_address_mapping_enabled(void);
 void fe7_gba_reset(int clear_ewram);
 // pressed_keys uses GBA KEYINPUT bit order (A, B, Select, Start, Right, Left, Up, Down, R, L).
 void fe7_gba_set_keys(uint16_t pressed_keys);

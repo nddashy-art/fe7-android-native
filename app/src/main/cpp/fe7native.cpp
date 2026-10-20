@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "fe7_engine_startup.h"
 #include "gba_header_parser.h"
 #include "gba_port.h"
 #include "third_party/libretro.h"
@@ -145,6 +146,9 @@ void StopCore() {
         retro_deinit();
         g_initialized = false;
     }
+    // The software GBA bus borrows g_rom.data(); detach it before the vector
+    // can release or reallocate its backing storage.
+    fe7_engine_shutdown();
     g_rom.clear();
     g_frame.clear();
     g_width = kFrameWidth;
@@ -171,7 +175,10 @@ jintArray CopyFrame(JNIEnv* env) {
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_org_fe7android_nativeport_MainActivity_nativeGetBridgeStatus(JNIEnv* env, jobject) {
-    return env->NewStringUTF("Puente C++/JNI activo; motor mGBA integrado");
+    const std::string status =
+        "Puente C++/JNI activo; el juego sigue ejecutándose en mGBA/libretro. "
+        "El runtime FE7 nativo prepara memoria/ROM, pero aún no ejecuta AgbMain.";
+    return env->NewStringUTF(status.c_str());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -213,6 +220,19 @@ Java_org_fe7android_nativeport_MainActivity_nativeStartGame(JNIEnv* env, jobject
     if (g_rom.size() < 0xC0) {
         g_rom.clear();
         return NewError(env, "La ROM es demasiado pequeña para ser una ROM GBA válida.");
+    }
+
+    // Attach the same user-supplied ROM buffer to the native GBA memory bus.
+    // This is preparation/integration only: mGBA remains responsible for all
+    // actual CPU execution and gameplay until the FE7 engine can be linked.
+    const Fe7EngineBootState native_state =
+        fe7_engine_prepare(g_rom.data(), g_rom.size());
+    if (native_state != FE7_ENGINE_BOOT_RUNTIME_PREPARED) {
+        const char* native_message = fe7_engine_boot_message();
+        const std::string error = native_message != nullptr
+            ? native_message : "motivo desconocido";
+        StopCore();
+        return NewError(env, "El runtime nativo rechazó la ROM: " + error);
     }
 
     retro_set_environment(Environment);

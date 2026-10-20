@@ -76,6 +76,12 @@ extern "C" int fe7_gba_attach_rom(const uint8_t* data, size_t size) {
     return g_memory.AttachRom(data, size) ? 1 : 0;
 }
 extern "C" void fe7_gba_detach_rom(void) { g_memory.DetachRom(); }
+extern "C" int fe7_gba_enable_fixed_address_mapping(void) {
+    return g_memory.EnableFixedAddressMapping() ? 1 : 0;
+}
+extern "C" int fe7_gba_fixed_address_mapping_enabled(void) {
+    return g_memory.IsFixedAddressMapped() ? 1 : 0;
+}
 extern "C" void fe7_gba_reset(int clear_ewram) { g_memory.Reset(clear_ewram != 0); }
 extern "C" void fe7_gba_set_keys(std::uint16_t pressed_keys) {
     constexpr std::uint16_t kGbaKeyMask = 0x03FFu;
@@ -87,7 +93,11 @@ extern "C" void fe7_gba_set_keys(std::uint16_t pressed_keys) {
 extern "C" int fe7_gba_render_frame(uint32_t* output_argb, size_t pixel_count) {
     return g_ppu.RenderFrame(output_argb, pixel_count) ? 1 : 0;
 }
-extern "C" void** fe7_gba_interrupt_vector_slot(void) { return &g_interrupt_vector; }
+extern "C" void** fe7_gba_interrupt_vector_slot(void) {
+    if (g_memory.IsFixedAddressMapped())
+        return reinterpret_cast<void**>(static_cast<std::uintptr_t>(0x03007FFCu));
+    return &g_interrupt_vector;
+}
 extern "C" volatile void* fe7_gba_io_pointer(uint32_t address, size_t length) {
     return g_memory.ResolveIoRegister(address, length);
 }

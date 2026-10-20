@@ -22,6 +22,37 @@ def replace_once(path: Path, old: str, new: str) -> bool:
         shutil.copy2(path, backup)
     path.write_text(source.replace(old, new, 1), encoding="utf-8")
     return True
+
+def wrap_clear_ewram(path: Path) -> bool:
+    """Clear the software GBA EWRAM region without calling GBA-only assembly helpers."""
+    source = path.read_text(encoding="utf-8")
+    if "fe7_gba_resolve_pointer(EWRAM_ADDR" in source:
+        return False
+    start = source.find("void ClearEwram(void)")
+    end = source.find("\nvoid AgbMain(void)", start)
+    if start < 0 or end < 0:
+        raise RuntimeError(f"could not locate ClearEwram in {path}")
+    original = source[start:end]
+    replacement = """#ifdef FE7_NATIVE_PORT
+#include <string.h>
+void ClearEwram(void)
+{
+    void *ewram = (void *)fe7_gba_resolve_pointer(EWRAM_ADDR, EWRAM_SIZE, 1);
+    if (ewram != NULL)
+        memset(ewram, 0, EWRAM_SIZE);
+}
+#else
+""" + original + """
+#endif // FE7_NATIVE_PORT
+"""
+    updated = source[:start] + replacement + source[end:]
+    backup = path.with_name(path.name + ".fe7native.bak")
+    if not backup.exists():
+        shutil.copy2(path, backup)
+    path.write_text(updated, encoding="utf-8")
+    return True
+
+
 def wrap_dma_macro(path: Path) -> bool:
     """Swap FE7's register-programming DMA macro for the host software DMA hook."""
     source = path.read_text(encoding="utf-8")
@@ -270,6 +301,7 @@ u32 (*COMMON(VerifySramFast) VerifySramFast)(void const * src, void * dst, u32 s
     REG_WAITCNT = (REG_WAITCNT & ~3) | 3;
 #endif
 }""")
+    changed += wrap_clear_ewram(root / "src" / "main.c")
     changed += wrap_dma_macro(inc / "gbaio.h")
     changed += wrap_interrupt_source(root / "src" / "interrupt.c")
     changed += wrap_agb_main(root / "src" / "main.c")
