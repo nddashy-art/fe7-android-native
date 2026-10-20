@@ -58,6 +58,9 @@ The Android CI workflow now inventories undefined symbols and relocation types f
 
 ### First FE7 startup-routine ports
 
-The native runtime now contains C++ equivalents of three small startup routines verified against the pinned FE7 US source: `InitSpriteAnims`, `RandInitB`, and `RandNextB`. The host smoke test checks the IWRAM animation-entry clearing pattern and the secondary RNG's 32-bit wraparound/state update. This is the first direct port of original startup routines, but it does not make `AgbMain` callable yet: the RAM-code installer, key-state initialization, `StartGame`, and many assembly/data dependencies remain.
+The native runtime now contains C++ equivalents of four small startup routines verified against the pinned FE7 US source: `InitSpriteAnims`, `RandInitB`, `RandNextB`, and `InitKeySt`. The host smoke test checks the IWRAM animation-entry clearing pattern, the secondary RNG's 32-bit wraparound/state update, and key-state field initialization. These direct ports do not make `AgbMain` callable yet: the RAM-code installer, key refresh, `StartGame`, and many assembly/data dependencies remain.
 
 CI now also attempts a real diagnostic shared-library link of the compiled FE7 probe objects and runtime per Android ABI, then uploads the linker's unresolved-symbol/relocation diagnostics as `fe7-native-link-attempt`. This link attempt is intentionally not used as the app library; it is allowed to fail so we can resolve the actual blockers without breaking the known-good mGBA fallback APK.
+
+
+The first linker diagnostic surfaced two avoidable symbol-collision groups on 32-bit ARM: FE7 `gbasvc.s` redefines BIOS services already implemented by the native compatibility layer, and `crt0.s` redefines `IntrMain` already supplied by the C service probe. Those files have been removed from the diagnostic object set so the next link report can focus on engine dependencies rather than known duplicate implementations. This is diagnostic cleanup, not a successful engine link.
