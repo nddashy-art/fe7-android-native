@@ -28,6 +28,11 @@ constexpr std::size_t kSramSize = 0x10000u;
 class MemoryBus final {
 public:
     MemoryBus();
+    ~MemoryBus();
+    MemoryBus(const MemoryBus&) = delete;
+    MemoryBus& operator=(const MemoryBus&) = delete;
+    bool EnableFixedAddressMapping();
+    bool IsFixedAddressMapped() const { return fixed_address_mapping_; }
     bool AttachRom(const std::uint8_t* data, std::size_t size);
     void DetachRom();
     std::size_t RomSize() const { return rom_size_; }
@@ -48,8 +53,8 @@ public:
     bool Write32(std::uint32_t address, std::uint32_t value);
     void Reset(bool clear_ewram);
 
-    const std::uint8_t* SramData() const { return sram_.data(); }
-    std::uint8_t* SramData() { return sram_.data(); }
+    const std::uint8_t* SramData() const;
+    std::uint8_t* SramData();
 
 private:
     template <typename T, std::size_t N>
@@ -68,6 +73,7 @@ private:
     std::array<std::uint8_t, kSramSize> sram_{};
     const std::uint8_t* rom_ = nullptr;
     std::size_t rom_size_ = 0;
+    bool fixed_address_mapping_ = false;
 };
 
 }  // namespace fe7::gba
