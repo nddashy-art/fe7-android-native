@@ -76,6 +76,12 @@ extern "C" int fe7_gba_attach_rom(const uint8_t* data, size_t size) {
     return g_memory.AttachRom(data, size) ? 1 : 0;
 }
 extern "C" void fe7_gba_detach_rom(void) { g_memory.DetachRom(); }
+extern "C" int fe7_gba_enable_fixed_address_mapping(void) {
+    return g_memory.EnableFixedAddressMapping() ? 1 : 0;
+}
+extern "C" int fe7_gba_fixed_address_mapping_enabled(void) {
+    return g_memory.IsFixedAddressMapped() ? 1 : 0;
+}
 extern "C" void fe7_gba_reset(int clear_ewram) { g_memory.Reset(clear_ewram != 0); }
 extern "C" void fe7_gba_set_keys(std::uint16_t pressed_keys) {
     constexpr std::uint16_t kGbaKeyMask = 0x03FFu;
