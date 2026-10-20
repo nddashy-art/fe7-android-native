@@ -15,7 +15,8 @@ import sys
 LABEL = re.compile(r"^(\.L[0-9A-Fa-f]+):\s*$")
 
 
-def normalize(source_text: str, omit_symbols: set[str]) -> tuple[str, int, list[str]]:
+def normalize(source_text: str, omit_symbols: set[str] | None = None) -> tuple[str, int]:
+    omit_symbols = omit_symbols or set()
     lines = source_text.splitlines(keepends=True)
     output: list[str] = []
     removed = 0
@@ -52,7 +53,7 @@ def normalize(source_text: str, omit_symbols: set[str]) -> tuple[str, int, list[
     duplicates = [name for name, count in Counter(labels).items() if count > 1]
     if duplicates:
         raise ValueError("cannot safely normalize non-adjacent duplicate labels: " + ", ".join(duplicates[:8]))
-    return result, removed, omitted
+    return result, removed
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -63,14 +64,14 @@ def main() -> int:
 
     try:
         original = args.source.read_text(encoding="utf-8")
-        normalized, removed, omitted = normalize(original, set(args.omit_symbol))
+        normalized, removed = normalize(original, set(args.omit_symbol))
         args.destination.parent.mkdir(parents=True, exist_ok=True)
         args.destination.write_text(normalized, encoding="utf-8")
     except (OSError, UnicodeError, ValueError) as exc:
         print(f"assembly normalization failed: {exc}", file=sys.stderr)
         return 2
 
-    omitted_text = ", ".join(omitted) if omitted else "none"
+    omitted_text = ", ".join(args.omit_symbol) if args.omit_symbol else "none"
     print(f"Prepared Android assembler copy: {args.destination} ({removed} duplicate local label(s) removed; omitted: {omitted_text}).")
     return 0
 
