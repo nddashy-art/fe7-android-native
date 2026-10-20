@@ -13,6 +13,8 @@
 #include <vector>
 
 extern "C" void InitSpriteAnims(void);
+extern "C" void RandInitB(std::uint32_t seed);
+extern "C" std::uint32_t RandNextB(void);
 
 int main() {
     using fe7::gba::MemoryBus;
@@ -59,6 +61,17 @@ int main() {
                                      sizeof(std::uint32_t)] == 0xA5A5A5A5u);
         }
     }
+
+    // Ported RandInitB/RandNextB preserve the original 32-bit GBA arithmetic
+    // and keep their state in the original IWRAM address.
+    RandInitB(0x42D690E9u);
+    auto* rng_state = static_cast<std::uint32_t*>(
+        fe7_gba_resolve_pointer(0x03000008u, sizeof(std::uint32_t), 0));
+    assert(rng_state != nullptr && *rng_state == 0x42D690E9u);
+    const std::uint32_t rng_value = (*rng_state << 2u) + 2u;
+    const std::uint32_t expected_rng_next = (rng_value * (rng_value + 1u)) >> 2u;
+    assert(RandNextB() == expected_rng_next);
+    assert(*rng_state == expected_rng_next);
 
     assert(fe7_gba_render_frame(nullptr, 0) == 0);
 
@@ -107,6 +120,6 @@ int main() {
     assert(fe7_engine_prepare(invalid_rom.data(), invalid_rom.size()) == FE7_ENGINE_BOOT_INVALID_ROM);
     fe7_engine_shutdown();
 
-    std::cout << "Native GBA runtime smoke tests passed (header, memory, InitSpriteAnims, PPU; no FE7 CPU/game loop).\\n";
+    std::cout << "Native GBA runtime smoke tests passed (header, memory, InitSpriteAnims, RandInitB/RandNextB, PPU; no FE7 CPU/game loop).\\n";
     return 0;
 }
