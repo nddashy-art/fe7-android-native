@@ -54,3 +54,10 @@ Please open an issue with device model, Android version, exact build logs, and s
 ### Native engine link audit
 
 The Android CI workflow now inventories undefined symbols and relocation types for real FE7 compile-probe objects, compares undefined references against definitions within each Android ABI, and groups remaining candidates by likely dependency class. The `fe7-native-link-audit` artifact is diagnostic evidence for the next integration step; it is not a successful engine link and does not mean the game is executing natively. See the [Android workflow](https://github.com/nddashy-art/fe7-android-native/actions/workflows/android-debug.yml).
+
+
+### First FE7 startup-routine ports
+
+The native runtime now contains C++ equivalents of three small startup routines verified against the pinned FE7 US source: `InitSpriteAnims`, `RandInitB`, and `RandNextB`. The host smoke test checks the IWRAM animation-entry clearing pattern and the secondary RNG's 32-bit wraparound/state update. This is the first direct port of original startup routines, but it does not make `AgbMain` callable yet: the RAM-code installer, key-state initialization, `StartGame`, and many assembly/data dependencies remain.
+
+CI now also attempts a real diagnostic shared-library link of the compiled FE7 probe objects and runtime per Android ABI, then uploads the linker's unresolved-symbol/relocation diagnostics as `fe7-native-link-attempt`. This link attempt is intentionally not used as the app library; it is allowed to fail so we can resolve the actual blockers without breaking the known-good mGBA fallback APK.
