@@ -49,3 +49,8 @@ See [PORTING_PLAN.md](docs/PORTING_PLAN.md) for the staged technical plan and [D
 ## Contributions
 
 Please open an issue with device model, Android version, exact build logs, and steps to reproduce any failure. Do not attach ROMs or copyrighted game assets.
+
+
+### Native engine link audit
+
+The Android CI workflow now collects undefined-symbol and relocation inventories for the real FE7 compile-probe object files. The `fe7-native-link-audit` artifact is diagnostic evidence for the next integration step; it is not a successful engine link and does not mean the game is executing natively. See the [Android workflow](https://github.com/nddashy-art/fe7-android-native/actions/workflows/android-debug.yml).
