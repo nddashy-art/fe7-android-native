@@ -64,3 +64,9 @@ CI now also attempts a real diagnostic shared-library link of the compiled FE7 p
 
 
 The first linker diagnostic surfaced two avoidable symbol-collision groups on 32-bit ARM: FE7 `gbasvc.s` redefines BIOS services already implemented by the native compatibility layer, and `crt0.s` redefines `IntrMain` already supplied by the C service probe. Those files have been removed from the diagnostic object set so the next link report can focus on engine dependencies rather than known duplicate implementations. This is diagnostic cleanup, not a successful engine link.
+
+### Fixed-address GBA memory experiment (ARMv7)
+
+The software memory bus has an optional fail-closed fixed-address mapping mode for the GBA regions, including the ROM window, EWRAM, IWRAM, I/O, VRAM, palette, OAM, and SRAM. It uses `MAP_FIXED_NOREPLACE` rather than replacing an existing Android mapping; if any requested range is occupied, setup fails without clobbering it. Host tests exercise direct numeric-address reads/writes and verify that the ROM bytes are visible in the mapped window. Android CI builds the APK with these changes.
+
+This is groundwork only. The native engine still cannot boot: the ARM32 diagnostic link reports absolute assembly relocations (`R_ARM_ABS32`) that Android will not accept in a shared library, and the ARM64 diagnostic reports required startup and gameplay routines that remain assembly-only. The original assembly needs genuine position-independent conversion or portable C/C++ replacements, and the missing startup/game-loop dependencies must be implemented before calling `AgbMain`. Do not treat a successful APK build or a successful memory-map test as a native FE7 boot.
