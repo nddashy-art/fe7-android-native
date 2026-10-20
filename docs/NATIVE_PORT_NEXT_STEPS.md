@@ -51,3 +51,8 @@ The Android debug workflow now checks out the upstream FE7 US source at pinned c
 ## Native ROM-buffer lifecycle integration (2026-10-19)
 
 The Android game-start JNI now validates and attaches the selected FE7 ROM to the native software GBA bus, while mGBA continues to execute the game. The runtime borrows the frontend's ROM vector without copying it and detaches before that vector is cleared. Host tests verify pointer identity and that ROM reads are no longer mapped after shutdown. This is an integration milestone only; no FE7 CPU or `AgbMain` execution is implied.
+
+
+## Automated object-level link audit (2026-10-20)
+
+Added `scripts/audit_fe7_native_objects.py` and an Android CI step that records per-object undefined symbols and relocation types for the actual FE7 source/startup/service/ARM7 probe objects. The generated `fe7-native-link-audit` artifact is intended to classify the next blockers (missing game functions/data versus GBA services and position-dependent relocations) before attempting a full shared-library link. It does not resolve those blockers by itself and is not a native boot test. The audit step must pass in CI and its report must be reviewed before choosing the next link changes.
