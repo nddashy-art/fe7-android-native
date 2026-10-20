@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Create an Android-assembler-safe copy of FE7 code.s without editing the source tree.
+"""Prepare FE7 ARM assembly for the Android build without editing upstream sources.
 
-The supplied snapshot contains one adjacent duplicate local label at the same
-address. Removing the duplicate declaration does not change any instruction or
-symbol address; all other assembly source text is preserved.
+This removes adjacent duplicate local labels and can omit routines for which a
+portable native C++ implementation is supplied.
 """
 from __future__ import annotations
 
@@ -71,10 +70,8 @@ def main() -> int:
         print(f"assembly normalization failed: {exc}", file=sys.stderr)
         return 2
 
-    print(
-        f"Prepared Android assembler copy: {args.destination} "
-        f"({removed} duplicate local label(s) removed; omitted: {\", \".join(omitted) if omitted else \"none\"})."
-    )
+    omitted_text = ", ".join(omitted) if omitted else "none"
+    print(f"Prepared Android assembler copy: {args.destination} ({removed} duplicate local label(s) removed; omitted: {omitted_text}).")
     return 0
 
 
