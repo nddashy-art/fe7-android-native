@@ -23,3 +23,8 @@ A trial full link exposed fixed-address `R_ARM_ABS32` relocations in the origina
 ## Next integration step
 
 Create a dependency/link report for the complete source/object set, then convert or replace fixed-address references and GBA-only BIOS instructions using tested host services. Only after those objects can be linked with no text relocations or unresolved game symbols should a native `AgbMain` entrypoint be called. Until then, the frontend must keep using the established emulator path rather than implying the game has booted natively.
+
+
+## Link-blocker inventory (2026-10-20)
+
+The Android CI build now generates a `fe7-native-link-audit` artifact from the compiled FE7 source and startup/service/assembly probe objects. It reports undefined-symbol references and relocation kinds per object. Use that evidence to group missing dependencies and identify position-dependent references before linking or calling `AgbMain`. This audit does not link or execute the engine.
