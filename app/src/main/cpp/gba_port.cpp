@@ -93,7 +93,11 @@ extern "C" void fe7_gba_set_keys(std::uint16_t pressed_keys) {
 extern "C" int fe7_gba_render_frame(uint32_t* output_argb, size_t pixel_count) {
     return g_ppu.RenderFrame(output_argb, pixel_count) ? 1 : 0;
 }
-extern "C" void** fe7_gba_interrupt_vector_slot(void) { return &g_interrupt_vector; }
+extern "C" void** fe7_gba_interrupt_vector_slot(void) {
+    if (g_memory.IsFixedAddressMapped())
+        return reinterpret_cast<void**>(static_cast<std::uintptr_t>(0x03007FFCu));
+    return &g_interrupt_vector;
+}
 extern "C" volatile void* fe7_gba_io_pointer(uint32_t address, size_t length) {
     return g_memory.ResolveIoRegister(address, length);
 }
