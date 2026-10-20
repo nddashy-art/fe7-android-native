@@ -92,7 +92,7 @@ jobs:
               arm64-v8a) COMPILER="$TOOLBIN/aarch64-linux-android24-clang++" ;;
               armeabi-v7a) COMPILER="$TOOLBIN/armv7a-linux-androideabi24-clang++" ;;
             esac
-            mapfile -t OBJECTS < <(find app/.cxx -type f -name '*.o' | grep "/$ABI/CMakeFiles/fe7_engine_\(seed\|startup_probe\|service_probe\|m4a_probe\|asm_probe\|runtime\)\.dir/" | sort)
+            mapfile -t OBJECTS < <(find app/.cxx -type f -name '*.o' | grep "/$ABI/CMakeFiles/\(fe7_engine_\(seed\|startup_probe\|service_probe\|m4a_probe\|asm_probe\)\|fe7runtime\)\.dir/" | sort)
             {
               echo "## $ABI"
               echo "Objects found: ${#OBJECTS[@]}"
