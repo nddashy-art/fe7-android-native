@@ -49,3 +49,26 @@ extern "C" std::uint32_t RandNextB(void) {
     *state = next;
     return next;
 }
+
+
+extern "C" void InitKeySt(void* keys) {
+    if (keys == nullptr) {
+        return;
+    }
+
+    // Field offsets and initial values are copied from FE7 US asm/code_1.s.
+    auto* bytes = static_cast<std::uint8_t*>(keys);
+    bytes[0x00] = 0x0Cu;
+    bytes[0x01] = 0x04u;
+    bytes[0x02] = 0u;
+    *reinterpret_cast<std::uint16_t*>(bytes + 0x04) = 0u;
+    *reinterpret_cast<std::uint16_t*>(bytes + 0x08) = 0u;
+    *reinterpret_cast<std::uint16_t*>(bytes + 0x0A) = 0u;
+    *reinterpret_cast<std::uint16_t*>(bytes + 0x12) = 0u;
+
+    auto* key_repeat = static_cast<std::uint16_t*>(
+        fe7_gba_resolve_pointer(0x0300000Eu, sizeof(std::uint16_t), 1));
+    if (key_repeat != nullptr) {
+        *key_repeat = 0;
+    }
+}
