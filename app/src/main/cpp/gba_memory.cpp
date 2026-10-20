@@ -105,12 +105,8 @@ bool MemoryBus::EnableFixedAddressMapping() {
     std::memcpy(reinterpret_cast<void*>(kVramBase), vram_.data(), vram_.size());
     std::memcpy(reinterpret_cast<void*>(kOamBase), oam_.data(), oam_.size());
     std::memcpy(reinterpret_cast<void*>(kSramBase), sram_.data(), sram_.size());
-    if (rom_ != nullptr && rom_size_ != 0) {
-        for (std::size_t bank = 0; bank < kGbaRomMappedSize; bank += kGbaRomBankSize) {
-            const auto copied = std::min(rom_size_, kGbaRomBankSize);
-            std::memcpy(reinterpret_cast<std::uint8_t*>(kRomBase) + bank, rom_, copied);
-        }
-    }
+    if (rom_ != nullptr && rom_size_ != 0)
+        std::memcpy(reinterpret_cast<void*>(kRomBase), rom_, rom_size_);
 
     fixed_address_mapping_ = true;
     g_fixed_map_owner = this;
@@ -128,21 +124,16 @@ bool MemoryBus::AttachRom(const std::uint8_t* data, std::size_t size) {
     rom_ = data;
     rom_size_ = size;
 #if defined(__unix__) || defined(__ANDROID__)
-    if (fixed_address_mapping_) {
-        for (std::size_t bank = 0; bank < kGbaRomMappedSize; bank += kGbaRomBankSize) {
-            std::memcpy(reinterpret_cast<std::uint8_t*>(kRomBase) + bank, data, size);
-        }
-    }
+    if (fixed_address_mapping_)
+        std::memcpy(reinterpret_cast<void*>(kRomBase), data, size);
 #endif
     return true;
 }
 
 void MemoryBus::DetachRom() {
 #if defined(__unix__) || defined(__ANDROID__)
-    if (fixed_address_mapping_ && rom_size_ != 0 && rom_size_ <= kGbaRomBankSize) {
-        for (std::size_t bank = 0; bank < kGbaRomMappedSize; bank += kGbaRomBankSize)
-            std::memset(reinterpret_cast<std::uint8_t*>(kRomBase) + bank, 0, rom_size_);
-    }
+    if (fixed_address_mapping_ && rom_size_ != 0 && rom_size_ <= kGbaRomBankSize)
+        std::memset(reinterpret_cast<void*>(kRomBase), 0, rom_size_);
 #endif
     rom_ = nullptr;
     rom_size_ = 0;
