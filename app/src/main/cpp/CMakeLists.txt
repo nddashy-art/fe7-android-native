@@ -18,6 +18,7 @@ add_library(fe7runtime STATIC
     gba_irq.cpp
     gba_frame_clock.cpp
     fe7_engine_startup.cpp
+    fe7_native_startup_shims.cpp
 )
 target_compile_features(fe7runtime PUBLIC cxx_std_17)
 target_compile_options(fe7runtime PRIVATE -Wall -Wextra)
