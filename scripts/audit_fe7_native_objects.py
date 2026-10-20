@@ -60,8 +60,8 @@ def main() -> int:
         relocations: Counter[str] = Counter()
         for line in reloc_output.splitlines():
             fields = line.split()
-            if len(fields) >= 3 and fields[0].startswith("0") and fields[1].startswith("R_"):
-                relocations[fields[1]] += 1
+            if len(fields) >= 3 and fields[0].startswith("0") and fields[2].startswith("R_"):
+                relocations[fields[2]] += 1
 
         undefined_totals.update(undefined)
         relocation_totals.update(relocations)
