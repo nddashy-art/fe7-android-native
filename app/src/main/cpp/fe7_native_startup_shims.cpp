@@ -26,3 +26,26 @@ extern "C" void InitSpriteAnims(void) {
         }
     }
 }
+
+
+extern "C" void RandInitB(std::uint32_t seed) {
+    auto* state = static_cast<std::uint32_t*>(
+        fe7_gba_resolve_pointer(0x03000008u, sizeof(std::uint32_t), 1));
+    if (state != nullptr) {
+        *state = seed;
+    }
+}
+
+extern "C" std::uint32_t RandNextB(void) {
+    auto* state = static_cast<std::uint32_t*>(
+        fe7_gba_resolve_pointer(0x03000008u, sizeof(std::uint32_t), 1));
+    if (state == nullptr) {
+        return 0;
+    }
+
+    // Exact 32-bit wraparound arithmetic from FE7's Thumb implementation.
+    const std::uint32_t value = (*state << 2u) + 2u;
+    const std::uint32_t next = (value * (value + 1u)) >> 2u;
+    *state = next;
+    return next;
+}
