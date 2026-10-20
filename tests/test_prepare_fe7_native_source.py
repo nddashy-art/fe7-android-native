@@ -46,6 +46,10 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             )
             (source / "interrupt.c").write_text(original_interrupt, encoding="utf-8")
             original_main = (
+                'void ClearEwram(void)\n{\n    int unk_0 = func_08002C0C();\n'
+                '    int unk_1 = func_08002C24();\n'
+                '    CpuFastFill(0, (void *)EWRAM_ADDR, EWRAM_SIZE);\n'
+                '    func_08002C3C(unk_0);\n    func_08002C58(unk_1);\n}\n\n'
                 'void AgbMain(void)\n{\n    InitGame();\n    for (;;)\n'
                 '    {\n        RunMainFunc();\n        SoftResetIfKeyCombo();\n'
                 '    }\n}\n\nvoid PutBuildInfo(u16 * tm)\n{\n}\n'
@@ -80,9 +84,10 @@ class PrepareSourceAdapterTest(unittest.TestCase):
             self.assertEqual((source / "interrupt.c.fe7native.bak").read_bytes(), original_interrupt_bytes)
             main_patched = (source / "main.c").read_text(encoding="utf-8")
             self.assertIn("void Fe7EngineRunFrame(void)", main_patched)
+            self.assertIn("fe7_gba_resolve_pointer(EWRAM_ADDR", main_patched)
             self.assertIn("#ifdef FE7_NATIVE_PORT", main_patched)
             self.assertEqual((source / "main.c.fe7native.bak").read_bytes(), original_main_bytes)
-            self.assertIn("(10 edits)", first.stdout)
+            self.assertIn("(11 edits)", first.stdout)
             self.assertIn("(0 edits)", second.stdout)
             self.assertTrue((include / "gba_port.h").is_file())
 
