@@ -79,6 +79,56 @@ jobs:
             "${FE7_OBJECTS[@]}"
           cat "$RUNNER_TEMP/fe7-native-link-audit.txt"
 
+      - name: Attempt real FE7 engine shared-library link (diagnostic)
+        shell: bash
+        run: |
+          set -u
+          REPORT="$RUNNER_TEMP/fe7-native-link-attempt.txt"
+          : > "$REPORT"
+          NDK_ROOT="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort | tail -1)"
+          TOOLBIN="$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for ABI in arm64-v8a armeabi-v7a; do
+            case "$ABI" in
+              arm64-v8a) COMPILER="$TOOLBIN/aarch64-linux-android24-clang++" ;;
+              armeabi-v7a) COMPILER="$TOOLBIN/armv7a-linux-androideabi24-clang++" ;;
+            esac
+            mapfile -t OBJECTS < <(find app/.cxx -type f -name '*.o' | grep "/$ABI/CMakeFiles/fe7_engine_\(seed\|startup_probe\|service_probe\|m4a_probe\|asm_probe\|runtime\)\.dir/" | sort)
+            {
+              echo "## $ABI"
+              echo "Objects found: ${#OBJECTS[@]}"
+            } >> "$REPORT"
+            if [ "${#OBJECTS[@]}" -eq 0 ]; then
+              echo "No objects found for $ABI; skipping." >> "$REPORT"
+              continue
+            fi
+            set +e
+            "$COMPILER" -shared -Wl,--no-undefined -Wl,--fatal-warnings \
+              -o "$RUNNER_TEMP/libfe7engine-link-probe-$ABI.so" "${OBJECTS[@]}" \
+              > "$RUNNER_TEMP/link-$ABI.stdout" 2> "$RUNNER_TEMP/link-$ABI.stderr"
+            RESULT=$?
+            set -e
+            {
+              echo "Link exit code: $RESULT"
+              echo "--- linker diagnostics ---"
+              cat "$RUNNER_TEMP/link-$ABI.stderr"
+              echo "--- stdout ---"
+              cat "$RUNNER_TEMP/link-$ABI.stdout"
+              echo
+            } >> "$REPORT"
+          done
+          cat "$REPORT"
+          # The candidate link is diagnostic and must not prevent the known-good
+          # mGBA-backed prototype APK from being produced.
+          test -s "$REPORT"
+
+      - name: Upload FE7 native link attempt
+        uses: actions/upload-artifact@v4
+        with:
+          name: fe7-native-link-attempt
+          path: ${{ runner.temp }}/fe7-native-link-attempt.txt
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload FE7 native link audit
         uses: actions/upload-artifact@v4
         with:
