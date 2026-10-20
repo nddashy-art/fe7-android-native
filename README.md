@@ -53,4 +53,4 @@ Please open an issue with device model, Android version, exact build logs, and s
 
 ### Native engine link audit
 
-The Android CI workflow now collects undefined-symbol and relocation inventories for the real FE7 compile-probe object files. The `fe7-native-link-audit` artifact is diagnostic evidence for the next integration step; it is not a successful engine link and does not mean the game is executing natively. See the [Android workflow](https://github.com/nddashy-art/fe7-android-native/actions/workflows/android-debug.yml).
+The Android CI workflow now inventories undefined symbols and relocation types for real FE7 compile-probe objects, compares undefined references against definitions within each Android ABI, and groups remaining candidates by likely dependency class. The `fe7-native-link-audit` artifact is diagnostic evidence for the next integration step; it is not a successful engine link and does not mean the game is executing natively. See the [Android workflow](https://github.com/nddashy-art/fe7-android-native/actions/workflows/android-debug.yml).
