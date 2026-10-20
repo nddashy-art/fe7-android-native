@@ -76,7 +76,7 @@ int main() {
 
     // InitKeySt is now native too; verify its documented field offsets and
     // that the global key-repeat register in IWRAM is cleared.
-    std::array<std::uint8_t, 0x14> key_state{};
+    alignas(2) std::array<std::uint8_t, 0x14> key_state{};
     key_state.fill(0xA5u);
     auto* key_repeat = static_cast<std::uint16_t*>(
         fe7_gba_resolve_pointer(0x0300000Eu, sizeof(std::uint16_t), 1));
